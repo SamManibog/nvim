@@ -77,12 +77,11 @@ vim.api.nvim_create_user_command("NewProject", function(args)
 
     --finalize directory
     if (lang == "cpp") then
-        print("cd " .. cwd .. "\\" .. projectName)
-        os.execute(
-        "cd \"" .. cwd .. "\\" .. projectName .. "\" & cmake -B build " ..
-        "-D CMAKE_EXPORT_COMPILE_COMMANDS=1 -D CMAKE_C_COMPILER=gcc " .. 
-        "-D CMAKE_CXX_COMPILER=g++ -G \"MinGW Makefiles\" -S ."
-        )
+        --os.execute(
+        --"cd \"" .. cwd .. "\\" .. projectName .. "\" & cmake -B build " ..
+        --"-D CMAKE_EXPORT_COMPILE_COMMANDS=1 -D CMAKE_C_COMPILER=gcc " .. 
+        --"-D CMAKE_CXX_COMPILER=g++ -G \"MinGW Makefiles\" -S ."
+        --)
     end
     print("Created " .. lang .. " project directory")
 
