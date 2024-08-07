@@ -5,7 +5,7 @@
 -- Make command ---------------------------------------------------------------
 -- function definition
 vim.api.nvim_create_user_command("Make", function()
-    os.execute("cd " .. vim.fn.getcwd() .. "\\build & make")
+    os.execute("cd \"" .. vim.fn.getcwd() .. "\\build\" & make")
 end, {desc = "run makefile from build folder", nargs = '?'})
 -- NewProject command ---------------------------------------------------------
 -- helper classes
@@ -77,7 +77,7 @@ vim.api.nvim_create_user_command("NewProject", function(args)
     if (lang == "cpp") then
         print("cd " .. cwd .. "\\" .. projectName)
         os.execute(
-        "cd " .. cwd .. "\\" .. projectName .. " & cmake -B build " ..
+        "cd \"" .. cwd .. "\\" .. projectName .. "\" & cmake -B build " ..
         "-D CMAKE_EXPORT_COMPILE_COMMANDS=1 -D CMAKE_C_COMPILER=gcc " .. 
         "-D CMAKE_CXX_COMPILER=g++ -G \"MinGW Makefiles\" -S . "
         )
@@ -111,7 +111,7 @@ function folderObject:new (name, folders, files)
     function output:build (path)
         print("Attempting to create directory " .. self.name .. " " .. self.id)
         local dirPath = path .. "\\" .. name
-        os.execute("md " .. dirPath)
+        os.execute("mkdir \"" .. dirPath .. "\"")
         for key,value in pairs(self.folders) do
             value:build(dirPath)
         end
