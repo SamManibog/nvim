@@ -62,6 +62,7 @@ vim.api.nvim_create_user_command("NewProject", function(args)
                 "cmake_minimum_required(VERSION 3.20)",
                 "project(" .. projectName .. ")",
                 "set(CMAKE_CXX_STANDARD 20)",
+                "link_directories(lib)",
                 "include_directories(include include/headers)",
                 "add_executable(${PROJECT_NAME} src/main.cpp)",
             })
