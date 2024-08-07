@@ -62,6 +62,7 @@ vim.api.nvim_create_user_command("NewProject", function(args)
                 "cmake_minimum_required(VERSION 3.20)",
                 "project(" .. projectName .. ")",
                 "set(CMAKE_CXX_STANDARD 20)",
+                "include_directories(include include/headers)",
                 "add_executable(${PROJECT_NAME} src/main.cpp)",
             })
         }
@@ -79,7 +80,7 @@ vim.api.nvim_create_user_command("NewProject", function(args)
         os.execute(
         "cd \"" .. cwd .. "\\" .. projectName .. "\" & cmake -B build " ..
         "-D CMAKE_EXPORT_COMPILE_COMMANDS=1 -D CMAKE_C_COMPILER=gcc " .. 
-        "-D CMAKE_CXX_COMPILER=g++ -G \"MinGW Makefiles\" -S . "
+        "-D CMAKE_CXX_COMPILER=g++ -G \"MinGW Makefiles\" -S ."
         )
     end
     print("Created " .. lang .. " project directory")
