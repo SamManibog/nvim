@@ -57,6 +57,7 @@ require("mason-lspconfig").setup({
                 }
             }
         end,
+        --[[
         ["clangd"] = function()
             local lspconfig = require('lspconfig')
             lspconfig.clangd.setup({
@@ -74,6 +75,7 @@ require("mason-lspconfig").setup({
                 },
             })
         end,
+        ]]-- 
     }
 })
 
