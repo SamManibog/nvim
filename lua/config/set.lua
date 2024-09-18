@@ -1,4 +1,3 @@
---vim.opt.guicursor = "n-v-c-sm-i-ci-ve:ver25,r-cr-o:hor20"
 vim.opt.guicursor = "a:block"
 
 vim.opt.nu = true
@@ -23,3 +22,4 @@ vim.opt.scrolloff = 10
 vim.opt.updatetime = 50
 
 --vim.opt.colorcolumn = "80"
+

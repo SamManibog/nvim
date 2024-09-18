@@ -17,7 +17,7 @@ vim.keymap.set("n", "<leader>f", function()
     vim.lsp.buf.format()
 end)
 
-vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>"]])
+--vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>"]])
 
 vim.keymap.set("n", "<C-s>", ":w<CR>")
 
@@ -27,5 +27,4 @@ vim.keymap.set("n", [[<leader>{]], [[Bi{<Esc>viW<Esc>a}<Esc>]])
 vim.keymap.set("n", [[<leader>"]], [[Bi"<Esc>viW<Esc>a"<Esc>]])
 vim.keymap.set("n", [[<leader>']], [[Bi'<Esc>viW<Esc>a'<Esc>]])
 vim.keymap.set("n", [[<leader><]], [[Bi<<Esc>viW<Esc>a><Esc>]])
-
 
