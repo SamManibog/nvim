@@ -28,4 +28,6 @@ vim.keymap.set("n", [[<leader>"]], [[Bi"<Esc>viW<Esc>a"<Esc>]])
 vim.keymap.set("n", [[<leader>']], [[Bi'<Esc>viW<Esc>a'<Esc>]])
 vim.keymap.set("n", [[<leader><]], [[Bi<<Esc>viW<Esc>a><Esc>]])
 
+vim.keymap.set("n", "<leader>t", [[:terminal<CR>A]])
+
 
