@@ -21,8 +21,6 @@ end)
 
 --vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>"]])
 
---vim.keymap.set("n", "<C-s>", ":w<CR>")
-
 --auto surround commands
 vim.keymap.set("n", [[<leader>(]], [[Bi(<Esc>viW<Esc>a)<Esc>]])
 vim.keymap.set("n", [[<leader>[]], [[Bi[<Esc>viW<Esc>a]<Esc>]])
@@ -34,3 +32,8 @@ vim.keymap.set("n", [[<leader><]], [[Bi<<Esc>viW<Esc>a><Esc>]])
 --quick toggle shell
 vim.keymap.set("n", "<C-s>", [[:tab split<CR>:te<CR>A]])
 vim.keymap.set("t", "<C-s>", [[<C-\><C-n>:q<CR>]])
+
+--tab navigation
+vim.keymap.set("n", "<leader>t", [[:tab split<CR>]])
+vim.keymap.set("n", "H", [[gT]])
+vim.keymap.set("n", "L", [[gt]])

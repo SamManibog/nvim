@@ -21,5 +21,7 @@ vim.opt.scrolloff = 10
 
 vim.opt.updatetime = 50
 
+vim.opt.shadafile = "NONE"
+
 --vim.opt.colorcolumn = "80"
 
