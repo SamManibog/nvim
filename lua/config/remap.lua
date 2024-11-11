@@ -21,7 +21,13 @@ end)
 
 --vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>"]])
 
---auto surround commands
+--insert mode movement
+vim.keymap.set({"i", "s"}, [[<C-h>]], [[<Left>]])
+vim.keymap.set({"i", "s"}, [[<C-j>]], [[<Down>]])
+vim.keymap.set({"i", "s"}, [[<C-k>]], [[<Up>]])
+vim.keymap.set({"i", "s"}, [[<C-l>]], [[<Right>]])
+
+--surround word with bracket/quote/etc
 vim.keymap.set("n", [[<leader>(]], [[Bi(<Esc>viW<Esc>a)<Esc>]])
 vim.keymap.set("n", [[<leader>[]], [[Bi[<Esc>viW<Esc>a]<Esc>]])
 vim.keymap.set("n", [[<leader>{]], [[Bi{<Esc>viW<Esc>a}<Esc>]])
