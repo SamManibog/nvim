@@ -1,3 +1,5 @@
+local util = require("config.utils")
+
 vim.g.mapleader = " "
 vim.keymap.set("n", "<leader>pv", vim.cmd.Ex)
 
@@ -43,3 +45,26 @@ vim.keymap.set("t", "<C-s>", [[<C-\><C-n>:q<CR>]])
 vim.keymap.set("n", "<leader>t", [[:tab split<CR>]])
 vim.keymap.set("n", "H", [[gT]])
 vim.keymap.set("n", "L", [[gt]])
+
+--diagnostic navigation
+vim.keymap.set(
+    "n",
+    "<leader>de",
+    function()
+        util.gotoFirstDiagnostic(0, vim.diagnostic.severity.ERROR)
+    end
+)
+vim.keymap.set(
+    "n",
+    "<leader>dw",
+    function()
+        util.gotoFirstDiagnostic(0, vim.diagnostic.severity.WARN)
+    end
+)
+vim.keymap.set(
+    "n",
+    "<leader>dh",
+    function()
+        util.gotoFirstDiagnostic(0, vim.diagnostic.severity.HINT)
+    end
+)
