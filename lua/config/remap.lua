@@ -47,6 +47,24 @@ vim.keymap.set("n", "<leader>t", [[:tab split<CR>]])
 vim.keymap.set("n", "H", [[gT]])
 vim.keymap.set("n", "L", [[gt]])
 
+--Go to definition/declaration
+vim.keymap.set(
+    "n",
+    "gd",
+    function()
+        vim.lsp.buf.definition()
+    end,
+    { noremap = true, silent = true }
+)
+vim.keymap.set(
+    "n",
+    "gD",
+    function()
+        vim.lsp.buf.declaration()
+    end,
+    { noremap = true, silent = true }
+)
+
 --diagnostic navigation
 vim.keymap.set(
     "n",

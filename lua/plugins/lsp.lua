@@ -28,6 +28,7 @@ return {
                 "lua_ls",
                 "clangd",
                 "omnisharp",
+                "rust_analyzer",
             },
             handlers = {
                 function(server_name) -- default handler (optional)
@@ -51,6 +52,10 @@ return {
                     }
                 }
             }
+        })
+
+        lspconfig.rust_analyzer.setup({
+            capabilities = capabilities,
         })
 
         lspconfig.clangd.setup({
