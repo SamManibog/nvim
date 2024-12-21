@@ -32,4 +32,24 @@ function M.gotoFirstDiagnostic(bufnr, severity)
     print(diagnosticSeverityMap[severity] .. ": " .. first.message)
 end
 
+function M.toggleTerminal()
+    if vim.bo.buftype == "terminal" then
+        vim.cmd("q")
+        return
+    end
+    vim.cmd("tab split")
+    vim.cmd("terminal")
+    vim.cmd("startinsert")
+end
+
+local runCommands = require("config.run_commands")
+function M.runFile(args)
+    local fileType = string.lower(vim.bo.filetype)
+    if fileType ~= nil and fileType ~= '' then
+        runCommands[fileType](args);
+    else
+        print("No run command exists for file type \"" .. fileType .. "\"")
+    end
+end
+
 return M

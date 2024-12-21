@@ -1,7 +1,7 @@
 local util = require("config.utils")
 
 vim.g.mapleader = " "
-vim.keymap.set("n", "<leader>pv", vim.cmd.Ex)
+vim.keymap.set("n", "<leader>pv", vim.cmd.Explore)
 
 --move line
 vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv")
@@ -38,8 +38,9 @@ vim.keymap.set("n", [[<leader>']], [[Bi'<Esc>viW<Esc>a'<Esc>]])
 vim.keymap.set("n", [[<leader><]], [[Bi<<Esc>viW<Esc>a><Esc>]])
 
 --quick toggle shell
-vim.keymap.set("n", "<C-s>", [[:tab split<CR>:te<CR>A]])
-vim.keymap.set("t", "<C-s>", [[<C-\><C-n>:q<CR>]])
+vim.keymap.set({"n", "t"}, "<C-s>", function()
+    util.toggleTerminal()
+end)
 
 --tab navigation
 vim.keymap.set("n", "<leader>t", [[:tab split<CR>]])
@@ -54,6 +55,7 @@ vim.keymap.set(
         util.gotoFirstDiagnostic(0, vim.diagnostic.severity.ERROR)
     end
 )
+
 vim.keymap.set(
     "n",
     "<leader>dw",
@@ -61,6 +63,7 @@ vim.keymap.set(
         util.gotoFirstDiagnostic(0, vim.diagnostic.severity.WARN)
     end
 )
+
 vim.keymap.set(
     "n",
     "<leader>dh",

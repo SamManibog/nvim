@@ -1,3 +1,5 @@
+local utils = require("config.utils")
+
 vim.api.nvim_create_user_command(
     "AsyncCall",
     function (data)
@@ -24,3 +26,28 @@ vim.api.nvim_create_user_command(
         desc = "Opens the buffer with the given index in a new tab",
     }
 )
+
+vim.api.nvim_create_user_command(
+    "Fileexplorer",
+    function(_)
+        os.execute("Explorer.exe " .. vim.fn.getcwd())
+    end,
+    {
+        nargs = 0,
+        desc = "Opens the windows file explorer on the current root",
+    }
+)
+
+--[[
+vim.api.nvim_create_user_command(
+    "Run",
+    function(args)
+        utils.runFile(args)
+    end,
+    {
+        nargs = '*',
+        desc = "Attempts to run the current file or project or file"
+        .. " precedence is given to the current file"
+    }
+)
+]]
