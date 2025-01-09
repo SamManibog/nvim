@@ -29,6 +29,7 @@ return {
                 "clangd",
                 "omnisharp",
                 "rust_analyzer",
+                "wgsl_analyzer",
             },
             handlers = {
                 function(server_name) -- default handler (optional)
@@ -92,5 +93,10 @@ return {
                 return vim.loop.cwd() -- current working directory
             end,
         })
+
+        lspconfig.wgsl_analyzer.setup({
+            capabilities = capabilities,
+        })
+
     end
 }
