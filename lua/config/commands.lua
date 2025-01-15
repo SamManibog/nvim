@@ -1,6 +1,28 @@
 local utils = require("config.utils")
 
 vim.api.nvim_create_user_command(
+    "Light",
+    function (_)
+        vim.cmd("colo kanagawa-lotus")
+    end,
+    {
+        nargs = 0,
+        desc = "sets colors to light theme",
+    }
+)
+
+vim.api.nvim_create_user_command(
+    "Dark",
+    function (_)
+        vim.cmd("colo kanagawa-dragon")
+    end,
+    {
+        nargs = 0,
+        desc = "sets colors to dark theme",
+    }
+)
+
+vim.api.nvim_create_user_command(
     "AsyncCall",
     function (data)
         vim.cmd("tabnew")
