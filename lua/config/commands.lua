@@ -63,12 +63,12 @@ vim.api.nvim_create_user_command(
 vim.api.nvim_create_user_command(
     "BSysRefresh",
     function(_)
-        utils.refreshBuildsystem()
-        local bs = vim.g.projectBuildsystem
+        require("config.buildsystems").refreshBuildsystem()
+        local bs = vim.g.projectBuildSystem
         if bs == nil then
             print("buildsystem refreshed ... none detected")
         else
-            print("buildsystem refreshed ... " .. bs .. " detected")
+            print("buildsystem refreshed ... " .. bs.name .. " detected")
         end
     end,
     {
@@ -77,32 +77,3 @@ vim.api.nvim_create_user_command(
     }
 )
 
-vim.api.nvim_create_user_command(
-    "BSysList",
-    function(_)
-        local detectionCommands = require("config.project_detection")
-        print("Recognized Buildsystems:\n")
-        for k, _ in pairs(detectionCommands) do
-            print(k .. "\n")
-        end
-    end,
-    {
-        nargs = 0,
-        desc = "Prints the list of recognized buildsystems",
-    }
-)
-
-
---[[
-vim.api.nvim_create_user_command(
-    "Run",
-    function(args)
-        utils.runFile(args)
-    end,
-    {
-        nargs = '*',
-        desc = "Attempts to run the current file or project or file"
-        .. " precedence is given to the current file"
-    }
-)
-]]

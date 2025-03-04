@@ -42,25 +42,4 @@ function M.toggleTerminal()
     vim.cmd("startinsert")
 end
 
-local runCommands = require("config.run_commands")
-function M.runFile(args)
-    local fileType = string.lower(vim.bo.filetype)
-    if fileType ~= nil and fileType ~= '' then
-        runCommands[fileType](args);
-    else
-        print("No run command exists for file type \"" .. fileType .. "\"")
-    end
-end
-
-local projectDetection = require("config.project_detection")
-function M.refreshBuildsystem()
-    for buildsystem, callback in pairs(projectDetection) do
-        if callback() then
-            vim.g.projectBuildsystem = buildsystem
-            return
-        end
-    end
-    vim.g.projectBuildsystem = nil
-end
-
 return M
