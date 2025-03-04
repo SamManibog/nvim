@@ -61,7 +61,17 @@ bs["cmake"] = {
             end,
             {
                 nargs = 0,
-                desc = "Compile the project"
+                desc = "Run the project"
+            }
+        )
+        vim.api.nvim_create_user_command(
+            "Mar",
+            function ()
+                runInTerminal("cmake --build build && /build/main.exe")
+            end,
+            {
+                nargs = 0,
+                desc = "Compile and run the project"
             }
         )
     end,
@@ -76,6 +86,33 @@ bs["cargo"] = {
     detect = function ()
         return isDirectoryEntry(vim.fn.getcwd().. "/Cargo.toml")
     end,
+    load = function ()
+        vim.api.nvim_create_user_command(
+            "Make",
+            function ()
+                runInTerminal("cargo build")
+            end,
+            {
+                nargs = 0,
+                desc = "Compile the project"
+            }
+        )
+        vim.api.nvim_create_user_command(
+            "Run",
+            function ()
+                runInTerminal("cargo run")
+            end,
+            {
+                nargs = 0,
+                desc = "Compile and run the project"
+            }
+        )
+    end,
+    unload = function ()
+        for _, name in pairs({"Make", "Build", "Run"}) do
+            vim.api.nvim_del_user_command(name)
+        end
+    end
 }
 
 for key, _ in pairs(bs) do
