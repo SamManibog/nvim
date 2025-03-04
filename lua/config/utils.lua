@@ -34,7 +34,8 @@ end
 
 function M.toggleTerminal()
     if vim.bo.buftype == "terminal" then
-        vim.cmd("q")
+        vim.cmd("bdelete!")
+        --vim.cmd("q")
         return
     end
     vim.cmd("tab split")

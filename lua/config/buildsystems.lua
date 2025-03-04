@@ -16,9 +16,11 @@ local function isDirectoryEntry(path)
    return ok, err
 end
 
---- Check if a directory exists in this path
-local function isDirectory(path)
-   return isDirectoryEntry(path.."/")
+--- Run a command in the terminal emulator
+local function runInTerminal(args)
+    vim.cmd("tabnew")
+    vim.cmd("terminal " .. args)
+    vim.cmd("startinsert")
 end
 
 --------------------------------------------------------------------
@@ -28,19 +30,56 @@ end
 local bs = {}
 
 bs["cmake"] = {
-    detect = function()
+    detect = function ()
         return isDirectoryEntry(vim.fn.getcwd().. "/CMakeLists.txt")
     end,
+    load = function ()
+        vim.api.nvim_create_user_command(
+            "Make",
+            function ()
+                runInTerminal("cmake --build build")
+            end,
+            {
+                nargs = 0,
+                desc = "Compile the project"
+            }
+        )
+        vim.api.nvim_create_user_command(
+            "Build",
+            function ()
+                runInTerminal("rmdir build /s /q && cmake --preset=debug -B build -S .")
+            end,
+            {
+                nargs = 0,
+                desc = "Rebuild the entire project and cmake cache"
+            }
+        )
+        vim.api.nvim_create_user_command(
+            "Run",
+            function ()
+                runInTerminal("/build/main.exe")
+            end,
+            {
+                nargs = 0,
+                desc = "Compile the project"
+            }
+        )
+    end,
+    unload = function ()
+        for _, name in pairs({"Make", "Build", "Run"}) do
+            vim.api.nvim_del_user_command(name)
+        end
+    end
 }
 
 bs["cargo"] = {
-    detect = function()
+    detect = function ()
         return isDirectoryEntry(vim.fn.getcwd().. "/Cargo.toml")
     end,
 }
 
-for key, value in pairs(bs) do
-    value["name"] = key
+for key, _ in pairs(bs) do
+    bs[key]["name"] = key
 end
 
 M.buildSystems = bs
@@ -50,20 +89,38 @@ M.buildSystems = bs
 --------------------------------------------------------------------
 
 --refreshes the global projectBuildSystem variable
-function M.refreshBuildsystem()
-    for buildSystem, data in pairs(M.buildSystems) do
+function M.refreshBuildSystem()
+    --unload current buildsystem
+    if
+        vim.g.projectBuildSystem ~= nil
+        and vim.g.projectBuildSystem.unload ~= nil
+    then
+        vim.g.projectBuildSystem.unload()
+    end
+
+    vim.g.projectBuildSystem = nil
+
+    --detect current buildsystem
+    for _, data in pairs(M.buildSystems) do
         if data.detect ~= nil and data.detect() then
-            vim.g.projectBuildSystem = buildSystem
-            return
+            vim.g.projectBuildSystem = data
+            break
         end
     end
-    vim.g.projectBuildSystem = nil
+
+    --load new buildsystem
+    if
+        vim.g.projectBuildSystem ~= nil
+        and vim.g.projectBuildSystem.load ~= nil
+    then
+        vim.g.projectBuildSystem.load()
+    end
 end
 
 function M.recognizedBuildSystems()
     local list = {}
     local index = 0
-    for buildsystem, data in pairs(M.buildSystems) do
+    for _, data in pairs(M.buildSystems) do
         list[index] = data.name
         index = index + 1
     end

@@ -1,9 +1,16 @@
 local bs = require("config.buildsystems")
 
 vim.api.nvim_create_autocmd(
-    "DirChanged",
+    'DirChanged',
     {
-        pattern = "global",
-        callback = bs.refreshBuildsystem
+        pattern = 'global',
+        callback = bs.refreshBuildSystem
+    }
+)
+
+vim.api.nvim_create_autocmd(
+    'VimEnter',
+    {
+        callback = bs.refreshBuildSystem
     }
 )
