@@ -60,6 +60,39 @@ vim.api.nvim_create_user_command(
     }
 )
 
+vim.api.nvim_create_user_command(
+    "BSysRefresh",
+    function(_)
+        utils.refreshBuildsystem()
+        local bs = vim.g.projectBuildsystem
+        if bs == nil then
+            print("buildsystem refreshed ... none detected")
+        else
+            print("buildsystem refreshed ... " .. bs .. " detected")
+        end
+    end,
+    {
+        nargs = 0,
+        desc = "Refreshes the current buildsystem",
+    }
+)
+
+vim.api.nvim_create_user_command(
+    "BSysList",
+    function(_)
+        local detectionCommands = require("config.project_detection")
+        print("Recognized Buildsystems:\n")
+        for k, _ in pairs(detectionCommands) do
+            print(k .. "\n")
+        end
+    end,
+    {
+        nargs = 0,
+        desc = "Prints the list of recognized buildsystems",
+    }
+)
+
+
 --[[
 vim.api.nvim_create_user_command(
     "Run",

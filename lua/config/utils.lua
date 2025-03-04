@@ -52,4 +52,15 @@ function M.runFile(args)
     end
 end
 
+local projectDetection = require("config.project_detection")
+function M.refreshBuildsystem()
+    for buildsystem, callback in pairs(projectDetection) do
+        if callback() then
+            vim.g.projectBuildsystem = buildsystem
+            return
+        end
+    end
+    vim.g.projectBuildsystem = nil
+end
+
 return M
