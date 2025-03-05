@@ -1,4 +1,5 @@
 local util = require("config.utils")
+local bs = require("config.buildsystems")
 
 vim.g.mapleader = " "
 vim.keymap.set("n", "<leader>pv", vim.cmd.Explore)
@@ -88,4 +89,11 @@ vim.keymap.set(
     function()
         util.gotoFirstDiagnostic(0, vim.diagnostic.severity.HINT)
     end
+)
+
+--buildsystem menu
+vim.keymap.set(
+    "n",
+    "<leader>b",
+    bs.openMenu
 )

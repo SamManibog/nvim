@@ -1,5 +1,7 @@
 local M = {}
 
+local popup = require("plenary.popup")
+
 --------------------------------------------------------------------
 --Utility Functions
 --------------------------------------------------------------------
@@ -33,86 +35,52 @@ bs["cmake"] = {
     detect = function ()
         return isDirectoryEntry(vim.fn.getcwd().. "/CMakeLists.txt")
     end,
-    load = function ()
-        vim.api.nvim_create_user_command(
-            "Make",
-            function ()
+    commands = {
+        c = {
+            desc = "Compile",
+            callback = function ()
                 runInTerminal("cmake --build build")
-            end,
-            {
-                nargs = 0,
-                desc = "Compile the project"
-            }
-        )
-        vim.api.nvim_create_user_command(
-            "Build",
-            function ()
+            end
+        },
+        b = {
+            desc = "Build",
+            callback = function ()
                 runInTerminal("rmdir build /s /q && cmake --preset=debug -B build -S .")
-            end,
-            {
-                nargs = 0,
-                desc = "Rebuild the entire project and cmake cache"
-            }
-        )
-        vim.api.nvim_create_user_command(
-            "Run",
-            function ()
+            end
+        },
+        r = {
+            desc = "Run",
+            callback = function ()
                 runInTerminal("/build/main.exe")
-            end,
-            {
-                nargs = 0,
-                desc = "Run the project"
-            }
-        )
-        vim.api.nvim_create_user_command(
-            "Mar",
-            function ()
+            end
+        },
+        m = {
+            desc = "Compile and Run",
+            callback = function ()
                 runInTerminal("cmake --build build && /build/main.exe")
-            end,
-            {
-                nargs = 0,
-                desc = "Compile and run the project"
-            }
-        )
-    end,
-    unload = function ()
-        for _, name in pairs({"Make", "Build", "Run"}) do
-            vim.api.nvim_del_user_command(name)
-        end
-    end
+            end
+        },
+    },
 }
 
 bs["cargo"] = {
     detect = function ()
         return isDirectoryEntry(vim.fn.getcwd().. "/Cargo.toml")
     end,
-    load = function ()
-        vim.api.nvim_create_user_command(
-            "Make",
-            function ()
+    commands = {
+        c = {
+            desc = "Compile",
+            callback = function ()
                 runInTerminal("cargo build")
-            end,
-            {
-                nargs = 0,
-                desc = "Compile the project"
-            }
-        )
-        vim.api.nvim_create_user_command(
-            "Run",
-            function ()
+            end
+        },
+        r = {
+            desc = "Run",
+            callback = function ()
                 runInTerminal("cargo run")
-            end,
-            {
-                nargs = 0,
-                desc = "Compile and run the project"
-            }
-        )
-    end,
-    unload = function ()
-        for _, name in pairs({"Make", "Build", "Run"}) do
-            vim.api.nvim_del_user_command(name)
-        end
-    end
+            end
+        },
+    }
 }
 
 for key, _ in pairs(bs) do
@@ -127,30 +95,13 @@ M.buildSystems = bs
 
 --refreshes the global projectBuildSystem variable
 function M.refreshBuildSystem()
-    --unload current buildsystem
-    if
-        vim.g.projectBuildSystem ~= nil
-        and vim.g.projectBuildSystem.unload ~= nil
-    then
-        vim.g.projectBuildSystem.unload()
-    end
-
     vim.g.projectBuildSystem = nil
-
     --detect current buildsystem
     for _, data in pairs(M.buildSystems) do
         if data.detect ~= nil and data.detect() then
             vim.g.projectBuildSystem = data
             break
         end
-    end
-
-    --load new buildsystem
-    if
-        vim.g.projectBuildSystem ~= nil
-        and vim.g.projectBuildSystem.load ~= nil
-    then
-        vim.g.projectBuildSystem.load()
     end
 end
 
@@ -162,6 +113,90 @@ function M.recognizedBuildSystems()
         index = index + 1
     end
     return list
+end
+
+function M.closeMenu()
+    if M.menuId ~= nil then
+        vim.api.nvim_win_close(M.menuId, true)
+        M.menuId = nil
+    end
+end
+
+function M.runCommand(keybind)
+    local cmdList = vim.g.projectBuildSystem.commands or nil
+    if cmdList ~= nil and cmdList[keybind] ~= nil then
+        cmdList[keybind].callback()
+    end
+    M.closeMenu()
+end
+
+function M.openMenu()
+    if vim.g.projectBuildSystem == nil then
+        print("There are no commands for the current buildsystem.")
+        M.menuId = nil
+        return
+    end
+
+    local commandList = vim.g.projectBuildSystem.commands
+
+    if commandList == nil then
+        print("There are no commands for the current buildsystem.")
+        M.menuId = nil
+        return
+    end
+
+    local menuText = {}
+
+    local height = 0
+    for keybind, command in pairs(commandList) do
+        table.insert(menuText, keybind .. " - " .. command.desc)
+        height = height + 1
+    end
+
+    if height == 0 then
+        print("There are no commands for the current buildsystem.")
+        return
+    end
+
+    local width = 30
+    local borderchars = {"─", "│", "─", "│", "┌", "┐", "┘", "└", }
+
+    local winId = popup.create(
+        menuText,
+        {
+            title = "BuildSystem Commands",
+            highlight = "kanagawa",
+            line = math.floor(((vim.o.lines - height) / 2) - 1),
+            col = math.floor((vim.o.columns - width) / 2),
+            minwidth = width,
+            minheight = height,
+            borderchars = borderchars,
+            callback = M.handleMenuInput,
+        }
+    )
+    local bufnr = vim.api.nvim_win_get_buf(winId)
+
+    M.menuId = winId
+
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+
+    for keybind, _ in pairs(commandList) do
+        vim.api.nvim_buf_set_keymap(
+            bufnr,
+            "n",
+            keybind,
+            "<cmd>lua require(\"config.buildsystems\").runCommand(\"" .. keybind .. "\")<CR>",
+            {silent = true}
+        )
+    end
+
+    vim.api.nvim_buf_set_keymap(
+        bufnr,
+        "n",
+        "q",
+        "<cmd>lua require(\"config.buildsystems\").closeMenu(" .. tostring(winId) .. ")<CR>",
+        {silent = true}
+    )
 end
 
 return M
