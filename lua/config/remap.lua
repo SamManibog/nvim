@@ -95,5 +95,5 @@ vim.keymap.set(
 vim.keymap.set(
     "n",
     "<leader>b",
-    bs.openMenu
+    bs.taskMenu
 )
