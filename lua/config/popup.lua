@@ -21,6 +21,7 @@ end
 ---@field private opts PopupOpts
 ---@field private closed boolean
 ---@field private close_aucmd number?
+---@field private resize_aucmd number?
 M.Popup = {}
 M.Popup.__index = M.Popup
 
@@ -69,6 +70,7 @@ function M.Popup:close()
 
         if self.close_aucmd ~= nil then
             vim.api.nvim_del_autocmd(self.close_aucmd)
+            vim.api.nvim_del_autocmd(self.resize_aucmd)
         end
     end
 end
