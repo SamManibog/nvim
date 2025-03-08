@@ -1,5 +1,3 @@
-local utils = require("config.utils")
-
 vim.api.nvim_create_user_command(
     "Light",
     function (_)

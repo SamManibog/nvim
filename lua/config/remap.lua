@@ -44,7 +44,7 @@ vim.keymap.set({"n", "t"}, "<C-s>", function()
 end)
 
 --tab navigation
-vim.keymap.set("n", "<leader>t", [[:tab split<CR>]])
+vim.keymap.set("n", "<leader>t", [[<cmd>tab split<CR>]])
 vim.keymap.set("n", "H", [[gT]])
 vim.keymap.set("n", "L", [[gt]])
 
