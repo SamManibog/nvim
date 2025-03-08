@@ -22,7 +22,6 @@ end
 ---@field private closed boolean
 ---@field private close_aucmd number?
 M.Popup = {}
-
 M.Popup.__index = M.Popup
 
 ---@class PopupOpts
@@ -228,7 +227,6 @@ function M.new(opts)
         resize_aucmd = resize_aucmd,
     }
     setmetatable(out, M.Popup)
-    out.__index = M.Popup
     out:resize()
 
     return out
