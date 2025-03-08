@@ -68,9 +68,14 @@ function M.Popup:close()
             vim.api.nvim_win_close(self.win_id, true)
         end
 
+        --destroy associated autocommands
         if self.close_aucmd ~= nil then
             vim.api.nvim_del_autocmd(self.close_aucmd)
+            self.close_aucmd = nil
+        end
+        if self.resize_aucmd ~= nil then
             vim.api.nvim_del_autocmd(self.resize_aucmd)
+            self.resize_aucmd = nil
         end
     end
 end
