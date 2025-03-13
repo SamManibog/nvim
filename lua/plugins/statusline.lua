@@ -52,15 +52,6 @@ return {
 
         local Align = { provider = "%=" }
         local Space = { provider = " " }
-        local LeftDivider = {
-            provider = "  ",
-            hl = { fg = "bg_1"}
-        }
-        local RightDivider = {
-            provider = "  ",
-            hl = { fg = "bg_1"}
-        }
-
 
         local ViMode = {
             init = function(self)
