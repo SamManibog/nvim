@@ -226,4 +226,23 @@ function M.new(opts)
     return out
 end
 
+---@class AdvInputPopup
+---@field private prompt_buf_id number      buf id for the prompt buffer
+---@field private prompt_win_id number      win id for the prompt buffer window
+---@field private input_buf_id number?      buf id for the input buffer
+---@field private input_win_id number?      win id for the input buffer window
+---@field private prompt_width number       the length of the prompt portion of the window
+---@field private opts AdvInputPopupOpts    the options used in managing the buffer
+---@field private closed boolean            whether or not the window has been closed
+---@field private close_aucmd number?       the autocommand id for handling closing the window
+---@field private resize_aucmd number?      the autocommand id for handling resizing the window
+M.AdvInputPopup = {}
+M.AdvInputPopup.__index = M.AdvInputPopup
+
+---@class AdvInputPopupOpts
+---@field prompts table         prompts to display as a collection of key, prompt pairs
+---@field title string?         the title to display on the popup, useless if border is not true
+---@field width number?         the minimum width of the input buffer
+---@field border boolean?       border?
+
 return M
