@@ -1,19 +1,6 @@
 local M = {}
 
----Sets a options from a table for a given buffer
----@param buf_id number
----@param opts table
-local function set_buf_opts(buf_id, opts)
-    for option, value in pairs(opts) do
-        vim.api.nvim_set_option_value(
-            option,
-            value,
-            {
-                buf = buf_id
-            }
-        )
-    end
-end
+local utils = require("config.utils")
 
 ---@class Popup
 ---@field private buf_id number
@@ -103,7 +90,7 @@ end
 ---sets the text of the popup
 ---@param text string[]
 function M.Popup:set_text(text)
-    set_buf_opts(self.buf_id, {
+    utils.set_buf_opts(self.buf_id, {
         modifiable = true,
     })
 
@@ -117,7 +104,7 @@ function M.Popup:set_text(text)
     )
     self:resize()
 
-    set_buf_opts(self.buf_id, {
+    utils.set_buf_opts(self.buf_id, {
         modifiable = false,
     })
 end
@@ -147,7 +134,7 @@ function M.new(opts)
         opts.text or {""}
     )
 
-    set_buf_opts(buffer, {
+    utils.set_buf_opts(buffer, {
         modifiable = false,
         bufhidden = "wipe",
         buftype = "nowrite",
@@ -195,14 +182,14 @@ function M.new(opts)
     if not opts.persistent then
         close_aucmd = vim.api.nvim_create_autocmd(
             {
-            "BufEnter",
-            "UIEnter",
-            "TabEnter",
-            "WinEnter",
-            "BufHidden",
-            "BufWipeout",
-            "BufLeave",
-            "BufWinLeave",
+                "BufEnter",
+                "UIEnter",
+                "TabEnter",
+                "WinEnter",
+                "BufHidden",
+                "BufWipeout",
+                "BufLeave",
+                "BufWinLeave",
             },
             {
                 callback = function ()

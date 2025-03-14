@@ -151,8 +151,13 @@ function M.taskMenu()
             p:get_buf_id(),
             "n",
             keybind,
-            "<cmd>lua require(\"config.buildsystems\").runCommand(\"" .. keybind .. "\")<CR>",
-            {silent = true}
+            "",
+            {
+                silent = true,
+                callback = function()
+                    M.runCommand(keybind)
+                end
+            }
         )
     end
 
@@ -160,8 +165,11 @@ function M.taskMenu()
         p:get_buf_id(),
         "n",
         "q",
-        "<cmd>lua require(\"config.buildsystems\").closeMenu()<CR>",
-        {silent = true}
+        "",
+        {
+            silent = true,
+            callback = M.closeMenu
+        }
     )
 
     M.popup = p

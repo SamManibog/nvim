@@ -70,10 +70,15 @@ function M.projectMenu()
             p:get_buf_id(),
             "n",
             tostring(project.index) .. "<CR>",
-            "<C-w><C-w><cmd>lua require(\"config.projectpicker\").closeMenu()<CR>"
-            .."<cmd>cd "..project.path.."<CR>"
-            .."<cmd>e "..project.path.."<CR>",
-            {silent = true}
+            "",
+            {
+                silent = true,
+                callback = function()
+                    M.closeMenu()
+                    vim.cmd("cd "..project.path)
+                    vim.cmd("e "..project.path)
+                end
+            }
         )
     end
 
@@ -81,16 +86,22 @@ function M.projectMenu()
         p:get_buf_id(),
         "n",
         "0<CR>",
-        "<cmd>lua require(\"config.projectpicker\").closeMenu()<CR>",
-        {silent = true}
+        "",
+        {
+            silent = true,
+            callback = M.closeMenu
+        }
     )
 
     vim.api.nvim_buf_set_keymap(
         p:get_buf_id(),
         "n",
         "q",
-        "<cmd>lua require(\"config.projectpicker\").closeMenu()<CR>",
-        {silent = true}
+        "",
+        {
+            silent = true,
+            callback = M.closeMenu
+        }
     )
 
     M.popup = p
