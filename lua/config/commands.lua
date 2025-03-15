@@ -1,16 +1,4 @@
 vim.api.nvim_create_user_command(
-    "Cpos",
-    function (_)
-        local pos = vim.api.nvim_win_get_cursor(0)
-        print("row: " .. pos[1] .. "; col: " ..pos[2])
-    end,
-    {
-        nargs = 0,
-        desc = "sets colors to light theme",
-    }
-)
-
-vim.api.nvim_create_user_command(
     "Light",
     function (_)
         vim.cmd("colo kanagawa-lotus")
@@ -86,4 +74,3 @@ vim.api.nvim_create_user_command(
         desc = "Refreshes the current buildsystem",
     }
 )
-
