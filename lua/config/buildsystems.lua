@@ -23,6 +23,7 @@ bs["cmake"] = {
         b = {
             desc = "Build",
             callback = function ()
+                print("todo: makesure build folder exists before attempting to remove it")
                 utils.runInTerminal("rmdir build /s /q && cmake --preset=debug -B build -S .")
             end
         },
