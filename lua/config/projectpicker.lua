@@ -1,13 +1,110 @@
 local M = {}
 
+-----------------------------------------------------------------------------------
+---Frontend
+-----------------------------------------------------------------------------------
+---@type {[string]: {
+---     opts: {[string]: (fun(text:string):boolean)?},
+---     template: fun(table):DirEntry}}
+M.templates = {
+    cmake = {--the name of the template
+        opts = {--a table of options that the user will be prompted to fill out
+            --prompt = verify_input_callback (or nil)
+        },
+        --spec = dirspec_generator_callback
+    }
+}
+
+--todo
+--add projects folder picker to specify which folder to use
+--add template picker to chose a template
+--add menu to enter opts, using either popup.new_input or popup.new_adv_input
+
+-----------------------------------------------------------------------------------
+---Backend
+-----------------------------------------------------------------------------------
+
 local popup = require("config.popup")
 local utils = require("config.utils")
 
---open the project menu
-function M.projectMenu()
-    --only one buildsystems menu should be active at a time
-    M.closeMenu()
+---@class DirEntry a representation of some sub directory
+---@field name string the name of the file including possible extensions (but not the path)
+---@field text (string | fun(opts: table):string)? text contents (files only)
+---@field entries (DirEntry[] | fun(opts: table):DirEntry[])? entry contents (folders only)
 
+---creates the given directory an all of its contents as a child of the given path
+---@param dir_entry DirEntry the directory entry to use as a template
+---@param path string the path at which to create the directory
+---@param opts table? a table of options to be called by contents functions
+function M.load_template(dir_entry, path, opts)
+    if dir_entry.name == nil then
+        print("invalid template, entries must have name field")
+    end
+    if
+        (dir_entry.text == nil and dir_entry.entries == nil)
+        or (dir_entry.text ~= nil and dir_entry.entries ~= nil)
+    then
+        print("invalid template, entries must have EITHER a text OR entries field")
+    end
+
+    if opts == nil then
+        opts = {}
+    end
+    if utils.isDirectory(path) then
+        if type(dir_entry.entries) ~= "nil" then
+            ---@type DirEntry[]
+            local entries
+            if type(dir_entry.entries) == "function" then
+                entries = dir_entry.entries(opts)
+            else
+                entries = dir_entry.entries --[[@as DirEntry[] ]]
+            end
+
+            local dir_name = path.."/"..dir_entry.name
+
+            if utils.isDirectoryEntry(dir_name) then
+                error("file "..dir_name.." already exists")
+            end
+
+            vim.uv.fs_mkdir(dir_name, tonumber("777", 8))
+
+            ---@type _, DirEntry
+            for _, entry in pairs(entries) do
+                M.load_template(entry, dir_name, opts)
+            end
+        else
+            ---@type string
+            local text
+            if type(dir_entry.text) == "function" then
+                text = dir_entry.text(opts)
+            else
+                text = dir_entry.text --[[@as string]]
+            end
+
+            local file_name = path.."/"..dir_entry.name
+
+            if utils.isDirectoryEntry(file_name) then
+                error("file "..file_name.." already exists")
+            end
+
+            local file = io.open(file_name, "w")
+            if file ~= nil then
+                file:write(text)
+                file:close()
+            else
+                error("unable to create file "..file_name)
+            end
+        end
+    else
+        error(path.." is not a valid directory")
+    end
+end
+
+function M.new_project()
+end
+
+--open the project menu
+function M.project_menu()
     --read environment variable for project folder
     local projFoldersRaw = os.getenv("ProjectLocations")
     if projFoldersRaw == nil then
@@ -59,7 +156,8 @@ function M.projectMenu()
     table.insert(menuText, string.rep(" ", maxDigits - 1).."n - [new project]")
     table.insert(menuText, string.rep(" ", maxDigits - 1).."q - [exit]")
 
-    local p = popup.new_input({
+    local p
+    p = popup.new_input({
         text = menuText,
         title = "Projects",
         width = 30,
@@ -86,10 +184,10 @@ function M.projectMenu()
             if text == "n" then
                 print("todo")
             elseif text == "q" or text == "0" then
-                M.closeMenu()
+                p:close()
             else
                 local p_path = index_map[tonumber(text)]
-                M.closeMenu()
+                p:close()
                 vim.cmd("cd "..p_path)
                 vim.cmd("e "..p_path)
             end
@@ -99,16 +197,9 @@ function M.projectMenu()
     M.popup = p
 end
 
-function M.closeMenu()
-    if M.popup ~= nil then
-        M.popup:close()
-    end
-    M.popup = nil
-end
-
 vim.api.nvim_create_user_command(
     "Proj",
-    M.projectMenu,
+    M.project_menu,
     {
         nargs = 0,
         desc = "Opens the project picker",
@@ -116,14 +207,14 @@ vim.api.nvim_create_user_command(
 )
 
 vim.api.nvim_create_autocmd(
-    'VimEnter',
+    'BufEnter',
     {
         callback = function ()
             if next(vim.fn.argv()) == nil then
-                --M.projectMenu()
-                vim.schedule(M.projectMenu)
+                vim.schedule(M.project_menu)
             end
-        end
+        end,
+        once = true
     }
 )
 

@@ -663,8 +663,9 @@ function M.new_input(opts)
     if opts.border ~= nil then
         base_opts.border = opts.border
     end
+    base_opts.persistent = true
 
-    local base_popup = M.new(opts)
+    local base_popup = M.new(base_opts)
     local buf = base_popup:get_buf_id()
     utils.set_buf_opts(
         buf,
@@ -694,17 +695,34 @@ function M.new_input(opts)
         base_popup:close()
     end)
     vim.cmd("startinsert")
-    vim.schedule(function()
-        vim.api.nvim_create_autocmd(
-            "ModeChanged",
-            {
-                callback = function()
-                    base_popup:close()
-                end,
-                buffer = buf
-            }
-        )
-    end)
+    vim.api.nvim_create_autocmd(
+        "BufEnter",
+        {
+            once = true,
+            callback = function()
+                local close_aucmd = vim.api.nvim_create_autocmd(
+                    {
+                        "BufEnter",
+                        "UIEnter",
+                        "TabEnter",
+                        "WinEnter",
+                        "BufHidden",
+                        "BufWipeout",
+                        "BufLeave",
+                        "BufWinLeave",
+                        "ModeChanged"
+                    },
+                    {
+                        callback = function ()
+                            base_popup:close()
+                        end
+                    }
+                )
+                ---@diagnostic disable-next-line: invisible
+                base_popup.close_aucmd = close_aucmd
+            end
+        }
+    )
     return base_popup
 end
 
