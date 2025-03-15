@@ -74,3 +74,26 @@ vim.api.nvim_create_user_command(
         desc = "Refreshes the current buildsystem",
     }
 )
+
+vim.api.nvim_create_user_command(
+    "Test",
+    function(_)
+        local popup = require("config.popup")
+        popup.new_input({
+            text = {"test text"},
+            on_confirm = function (text)
+                print("got: "..text)
+            end,
+            width = 30,
+            border = true,
+            title = "test",
+            verify_input = function (text)
+                return text == "q"
+            end
+        })
+    end,
+    {
+        nargs = 0,
+        desc = "Refreshes the current buildsystem",
+    }
+)

@@ -47,14 +47,12 @@ function M.projectMenu()
     --generate menu text
     local maxDigits = math.floor(math.log10(projectCount))
     local menuText = {}
-    local height = 0
     local index = 1
     for _, project in pairs(projects) do
         local indexDigits = math.floor(math.log10(projectCount))
         local padding = string.rep(" ", maxDigits - indexDigits)
         table.insert(menuText, padding .. index .. " - " .. project.name)
         project.index = index
-        height = height + 1
         index = index + 1
     end
 

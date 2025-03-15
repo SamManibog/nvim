@@ -15,8 +15,8 @@ M.Popup.__index = M.Popup
 ---@class PopupOpts
 ---@field text string[]         text to display on the popup as a list of lines
 ---@field title string?         the title to display on the popup, useless if border is not true
----@field width integer?         the minimum width excluding the border
----@field height integer?        the minimum height excluding the border
+---@field width integer?        the minimum width excluding the border
+---@field height integer?       the minimum height excluding the border
 ---@field border boolean?       border?
 ---@field persistent boolean?   Whether or not the popup will persist once window has been exited
 
@@ -379,7 +379,7 @@ end
 
 ---Creates a new popup
 ---@param opts AdvInputPopupOpts
-function M.new_input(opts)
+function M.new_adv_input(opts)
     local dim = calculate_input_dimensions(opts)
 
     --create prompt buffer
@@ -633,6 +633,77 @@ function M.new_input(opts)
     end
 
     return out
+end
+
+---@class InputPopupOpts
+---@field text string[]         text to display on the popup as a list of lines
+---@field title string?         the title to display on the popup, useless if border is not true
+---@field width integer?        the minimum width excluding the border
+---@field border boolean?       border?
+
+---@param opts {
+---text: string[],
+---title: string?,
+---width: integer?,
+---border: boolean?,
+---verify_input: (fun(text:string):boolean)?,
+---on_confirm: fun(text:string),
+---prompt: string?}
+function M.new_input(opts)
+    local base_opts = {}
+    base_opts.text = opts.text
+    table.insert(base_opts.text,"")
+    if opts.title ~= nil then
+        base_opts.title = opts.title
+    end
+    if opts.width ~= nil then
+        base_opts.width = opts.width
+    end
+    if opts.border ~= nil then
+        base_opts.border = opts.border
+    end
+
+    local base_popup = M.new(opts)
+    local buf = base_popup:get_buf_id()
+    utils.set_buf_opts(
+        buf,
+        {
+            buftype = "prompt",
+            modifiable = true
+        }
+    )
+    vim.fn.prompt_setprompt(buf, opts.prompt or "")
+    vim.fn.prompt_setcallback(buf,function (text)
+        if opts.verify_input ~= nil then
+            if not opts.verify_input(text) then
+                vim.api.nvim_buf_set_lines(
+                    buf,
+                    ---@diagnostic disable-next-line: invisible
+                    #base_popup.opts.text,
+                    -1,
+                    false,
+                    {}
+                )
+                vim.cmd("startinsert!")
+                print("Invalid input '"..text.."'.")
+                return
+            end
+        end
+        opts.on_confirm(text)
+        base_popup:close()
+    end)
+    vim.cmd("startinsert")
+    vim.schedule(function()
+        vim.api.nvim_create_autocmd(
+            "ModeChanged",
+            {
+                callback = function()
+                    base_popup:close()
+                end,
+                buffer = buf
+            }
+        )
+    end)
 end
 
 return M
