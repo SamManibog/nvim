@@ -48,59 +48,53 @@ function M.projectMenu()
     local maxDigits = math.floor(math.log10(projectCount))
     local menuText = {}
     local index = 1
+    local index_map = {}
     for _, project in pairs(projects) do
         local indexDigits = math.floor(math.log10(projectCount))
         local padding = string.rep(" ", maxDigits - indexDigits)
         table.insert(menuText, padding .. index .. " - " .. project.name)
-        project.index = index
+        index_map[index] = project.path
         index = index + 1
     end
+    table.insert(menuText, string.rep(" ", maxDigits - 1).."n - [new project]")
+    table.insert(menuText, string.rep(" ", maxDigits - 1).."q - [exit]")
 
-    local p = popup.new({
+    local p = popup.new_input({
         text = menuText,
         title = "Projects",
         width = 30,
         border = true,
+        prompt = "> ",
+        verify_input = function (text)
+            if
+                text == "n"
+                or text == "q"
+            then
+                return true
+            end
+            local p_index = tonumber(text)
+            if
+                p_index == nil
+                or p_index ~= math.floor(p_index)
+            then
+                return false
+            else
+                return p_index >= 1 and p_index < index
+            end
+        end,
+        on_confirm = function (text)
+            if text == "n" then
+                print("todo")
+            elseif text == "q" or text == "0" then
+                M.closeMenu()
+            else
+                local p_path = index_map[tonumber(text)]
+                M.closeMenu()
+                vim.cmd("cd "..p_path)
+                vim.cmd("e "..p_path)
+            end
+        end
     })
-
-    for _, project in pairs(projects) do
-        vim.api.nvim_buf_set_keymap(
-            p:get_buf_id(),
-            "n",
-            tostring(project.index) .. "<CR>",
-            "",
-            {
-                silent = true,
-                callback = function()
-                    M.closeMenu()
-                    vim.cmd("cd "..project.path)
-                    vim.cmd("e "..project.path)
-                end
-            }
-        )
-    end
-
-    vim.api.nvim_buf_set_keymap(
-        p:get_buf_id(),
-        "n",
-        "0<CR>",
-        "",
-        {
-            silent = true,
-            callback = M.closeMenu
-        }
-    )
-
-    vim.api.nvim_buf_set_keymap(
-        p:get_buf_id(),
-        "n",
-        "q",
-        "",
-        {
-            silent = true,
-            callback = M.closeMenu
-        }
-    )
 
     M.popup = p
 end

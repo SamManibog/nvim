@@ -649,6 +649,7 @@ end
 ---verify_input: (fun(text:string):boolean)?,
 ---on_confirm: fun(text:string),
 ---prompt: string?}
+---@return Popup
 function M.new_input(opts)
     local base_opts = {}
     base_opts.text = opts.text
@@ -704,6 +705,7 @@ function M.new_input(opts)
             }
         )
     end)
+    return base_popup
 end
 
 return M
