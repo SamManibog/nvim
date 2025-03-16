@@ -61,7 +61,7 @@ vim.api.nvim_create_user_command(
 vim.api.nvim_create_user_command(
     "BSysRefresh",
     function(_)
-        require("config.buildsystems").refreshBuildsystem()
+        require("config.buildsystems").refreshBuildSystem()
         local bs = vim.g.projectBuildSystem
         if bs == nil then
             print("buildsystem refreshed ... none detected")

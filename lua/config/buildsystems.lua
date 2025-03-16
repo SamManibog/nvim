@@ -39,6 +39,25 @@ bs["cmake"] = {
                 utils.runInTerminal("cmake --build build && /build/main.exe")
             end
         },
+        I = {
+            desc = "Install as Package",
+            callback = function ()
+                local package_folder = os.getenv("CMakePackagePath")
+                if package_folder == nil then
+                    print("CMakePackagePath environment variable must be set")
+                end
+                if utils.isDirectoryEntry(package_folder) then
+                    vim.uv.fs_rmdir("./build")
+                    utils.runInTerminal(
+                        [[cmake -G "MinGW Makefiles" -B build -S . -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --install-prefix "C:\Users\sfman\Packages\Installed"
+&& cmake --build build
+&& cmake --install build --config Debug]]
+                    )
+                else
+                    print(package_folder.." is not a valid directory")
+                end
+            end,
+        },
     },
 }
 
@@ -74,11 +93,20 @@ M.buildSystems = bs
 
 --refreshes the global projectBuildSystem variable
 function M.refreshBuildSystem()
+    if
+        M.currentBuildSystem ~= nil
+        and M.currentBuildSystem.on_detatch ~= nil
+    then
+        M.currentBuildSystem.on_detatch()
+    end
     M.currentBuildSystem = nil
     --detect current buildsystem
     for _, data in pairs(M.buildSystems) do
         if data.detect ~= nil and data.detect() then
             M.currentBuildSystem = data
+            if data.on_attatch ~= nil then
+                data.on_attatch()
+            end
             break
         end
     end

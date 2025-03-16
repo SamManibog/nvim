@@ -72,8 +72,8 @@ end
 -- Run a command in the terminal emulator
 function M.runInTerminal(args)
     vim.cmd("tabnew")
-    vim.cmd("terminal " .. args)
-    vim.cmd("startinsert")
+    pcall(vim.cmd, "terminal " .. args)
+    pcall(vim.cmd, "startinsert")
 end
 
 ---Sets a options from a table for a given buffer
