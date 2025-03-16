@@ -30,13 +30,13 @@ bs["cmake"] = {
         r = {
             desc = "Run",
             callback = function ()
-                utils.runInTerminal("/build/main.exe")
+                utils.runInTerminal("cd build && main.exe")
             end
         },
         m = {
             desc = "Compile and Run",
             callback = function ()
-                utils.runInTerminal("cmake --build build && /build/main.exe")
+                utils.runInTerminal("cmake --build build && cd build && main.exe")
             end
         },
         I = {
