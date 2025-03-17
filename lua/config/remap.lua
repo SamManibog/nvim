@@ -53,6 +53,7 @@ vim.keymap.set(
     "n",
     "gd",
     function()
+        vim.cmd("tab split")
         vim.lsp.buf.definition()
     end,
     { noremap = true, silent = true }
@@ -61,6 +62,7 @@ vim.keymap.set(
     "n",
     "gD",
     function()
+        vim.cmd("tab split")
         vim.lsp.buf.declaration()
     end,
     { noremap = true, silent = true }
