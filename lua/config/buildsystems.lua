@@ -11,32 +11,40 @@ local bs = {}
 
 bs["cmake"] = {
     detect = function ()
-        return utils.isDirectoryEntry(vim.fn.getcwd().. "/CMakeLists.txt")
+        return utils.isDirectoryEntry(vim.fn.getcwd().."/CMakeLists.txt")
     end,
     commands = {
         c = {
             desc = "Compile",
             callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
                 utils.runInTerminal("cmake --build build")
             end
         },
         b = {
             desc = "Build",
             callback = function ()
-                print("todo: makesure build folder exists before attempting to remove it")
-                utils.runInTerminal("rmdir build /s /q && cmake --preset=debug -B build -S .")
+                if utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_rmdir(vim.fn.getcwd()"/build")
+                end
+                utils.runInTerminal("cmake --preset=debug -B build -S .")
             end
         },
         r = {
             desc = "Run",
             callback = function ()
-                utils.runInTerminal("cd build && main.exe")
+                utils.runInTerminal("\"./build/main.exe\"")
             end
         },
         m = {
             desc = "Compile and Run",
             callback = function ()
-                utils.runInTerminal("cmake --build build && cd build && main.exe")
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build && \"./build/main.exe\"")
             end
         },
         I = {
@@ -47,7 +55,9 @@ bs["cmake"] = {
                     print("CMakePackagePath environment variable must be set")
                 end
                 if utils.isDirectoryEntry(package_folder) then
-                    vim.uv.fs_rmdir("./build")
+                    if utils.isDirectory(vim.fn.getcwd().."/build") then
+                        vim.uv.fs_rmdir(vim.fn.getcwd()"/build")
+                    end
                     utils.runInTerminal(
                         [[cmake -G "MinGW Makefiles" -B build -S . -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --install-prefix "C:\Users\sfman\Packages\Installed"
 && cmake --build build
