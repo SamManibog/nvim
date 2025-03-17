@@ -27,7 +27,7 @@ bs["cmake"] = {
             desc = "Build",
             callback = function ()
                 if utils.isDirectory(vim.fn.getcwd().."/build") then
-                    vim.uv.fs_rmdir(vim.fn.getcwd()"/build")
+                    vim.uv.fs_rmdir(vim.fn.getcwd().."/build")
                 end
                 utils.runInTerminal("cmake --preset=debug -B build -S .")
             end
