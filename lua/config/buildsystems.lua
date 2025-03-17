@@ -58,11 +58,7 @@ bs["cmake"] = {
                     if utils.isDirectory(vim.fn.getcwd().."/build") then
                         vim.uv.fs_rmdir(vim.fn.getcwd().."/build")
                     end
-                    utils.runInTerminal(
-                        [[cmake -G "MinGW Makefiles" -B build -S . -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --install-prefix "C:\Users\sfman\Packages\Installed"
-&& cmake --build build
-&& cmake --install build --config Debug]]
-                    )
+                    utils.runInTerminal([[cmake -G "MinGW Makefiles" -B build -S . -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --install-prefix "C:\Users\sfman\Packages\Installed" && cmake --build build && cmake --install build --config Debug]])
                 else
                     print(package_folder.." is not a valid directory")
                 end
