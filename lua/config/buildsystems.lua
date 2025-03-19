@@ -14,7 +14,7 @@ bs["cmake"] = {
         return utils.isDirectoryEntry(vim.fn.getcwd().."/CMakeLists.txt")
     end,
     commands = {
-        c = {
+        cc = {
             desc = "Compile",
             callback = function ()
                 if not utils.isDirectory(vim.fn.getcwd().."/build") then
@@ -38,13 +38,31 @@ bs["cmake"] = {
                 utils.runInTerminal("\"./build/main.exe\"")
             end
         },
-        m = {
+        cr = {
             desc = "Compile and Run",
             callback = function ()
                 if not utils.isDirectory(vim.fn.getcwd().."/build") then
                     vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
                 end
                 utils.runInTerminal("cmake --build build && \"./build/main.exe\"")
+            end
+        },
+        cts = {
+            desc = "Compile and Test (Silent)",
+            callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build && cd build && ctest")
+            end
+        },
+        ctl = {
+            desc = "Compile and Test (Verbose)",
+            callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build && cd build && ctest --verbose")
             end
         },
         I = {
@@ -176,7 +194,7 @@ function M.taskMenu()
 
     local p = popup.new({
         text = menuText,
-        title = "Projects",
+        title = "Tasks",
         width = 30,
         border = true,
     })
