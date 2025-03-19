@@ -64,7 +64,6 @@ return {
             cmd = {
                 "clangd",
                 "--query-driver=**",
-                "--header-insertion=iwyu",
                 "--log=verbose",
                 "--enable-config",
             },
