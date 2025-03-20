@@ -47,6 +47,18 @@ bs["cmake"] = {
                 utils.runInTerminal("cmake --build build && \"./build/main.exe\"")
             end
         },
+        ts = {
+            desc = "Test (Silent)",
+            callback = function ()
+                utils.runInTerminal("cd build && ctest")
+            end
+        },
+        tl = {
+            desc = "Test (Verbose)",
+            callback = function ()
+                utils.runInTerminal("cd build && ctest --verbose")
+            end
+        },
         cts = {
             desc = "Compile and Test (Silent)",
             callback = function ()
