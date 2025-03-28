@@ -207,11 +207,11 @@ vim.api.nvim_create_user_command(
 )
 
 vim.api.nvim_create_autocmd(
-    'BufEnter',
+    'UIEnter',
     {
         callback = function ()
             if next(vim.fn.argv()) == nil then
-                vim.schedule(M.project_menu)
+                M.project_menu()
             end
         end,
         once = true

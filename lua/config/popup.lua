@@ -695,34 +695,28 @@ function M.new_input(opts)
         base_popup:close()
     end)
     vim.cmd("startinsert")
-    vim.api.nvim_create_autocmd(
-        "BufEnter",
-        {
-            once = true,
-            callback = function()
-                local close_aucmd = vim.api.nvim_create_autocmd(
-                    {
-                        "BufEnter",
-                        "UIEnter",
-                        "TabEnter",
-                        "WinEnter",
-                        "BufHidden",
-                        "BufWipeout",
-                        "BufLeave",
-                        "BufWinLeave",
-                        "ModeChanged"
-                    },
-                    {
-                        callback = function ()
-                            base_popup:close()
-                        end
-                    }
-                )
-                ---@diagnostic disable-next-line: invisible
-                base_popup.close_aucmd = close_aucmd
-            end
-        }
-    )
+    vim.schedule(function ()
+        local close_aucmd = vim.api.nvim_create_autocmd(
+            {
+                "BufEnter",
+                "UIEnter",
+                "TabEnter",
+                "WinEnter",
+                "BufHidden",
+                "BufWipeout",
+                "BufLeave",
+                "BufWinLeave",
+                "ModeChanged"
+            },
+            {
+                callback = function ()
+                    base_popup:close()
+                end
+            }
+        )
+        ---@diagnostic disable-next-line: invisible
+        base_popup.close_aucmd = close_aucmd
+    end)
     return base_popup
 end
 
