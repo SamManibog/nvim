@@ -190,6 +190,17 @@ function M.project_menu()
                 p:close()
                 vim.cmd("cd "..p_path)
                 vim.cmd("e "..p_path)
+                --ModeChanged is not emitted properly without this
+                vim.api.nvim_feedkeys(
+                    vim.api.nvim_replace_termcodes(
+                        ":<BS>",
+                            true,
+                            false,
+                            true
+                    ),
+                    'n',
+                    false
+                )
             end
         end
     })
