@@ -136,11 +136,6 @@ function M.project_menu()
         end
     end
 
-    if projectCount == 0 then
-        print("No projects found.")
-        return
-    end
-
     --generate menu text
     local maxDigits = math.floor(math.log10(projectCount))
     local menuText = {}
