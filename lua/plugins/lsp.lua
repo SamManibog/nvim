@@ -1,6 +1,7 @@
 return {
     "neovim/nvim-lspconfig",
     dependencies = {
+        "neovim/nvim-lspconfig",
         "williamboman/mason.nvim",
         "williamboman/mason-lspconfig.nvim",
         "hrsh7th/cmp-nvim-lsp",
@@ -22,27 +23,7 @@ return {
             cmp_lsp.default_capabilities()
         )
 
-        require("mason").setup()
-        require("mason-lspconfig").setup({
-            ensure_installed = {
-                "lua_ls",
-                "clangd",
-                "omnisharp",
-                "rust_analyzer",
-                "wgsl_analyzer",
-            },
-            handlers = {
-                function(server_name) -- default handler (optional)
-                    require("lspconfig")[server_name].setup {
-                        capabilities = capabilities
-                    }
-                end,
-            }
-        })
-
-        local lspconfig = require("lspconfig")
-
-        lspconfig.lua_ls.setup({
+        vim.lsp.config("lua_ls", {
             capabilities = capabilities,
             filetypes = { "lua" },
             settings = {
@@ -55,11 +36,11 @@ return {
             }
         })
 
-        lspconfig.rust_analyzer.setup({
+        vim.lsp.config("rust_analyzer", {
             capabilities = capabilities,
         })
 
-        lspconfig.clangd.setup({
+        vim.lsp.config("clangd", {
             capabilities = capabilities,
             cmd = {
                 "clangd",
@@ -79,7 +60,7 @@ return {
             }
         })
 
-        lspconfig.omnisharp.setup({
+        vim.lsp.config("omnisharp", {
             capabilities = capabilities,
             cmd = {
                 "dotnet",
@@ -93,9 +74,11 @@ return {
             end,
         })
 
-        lspconfig.wgsl_analyzer.setup({
+        vim.lsp.config("wgsl_analyzer", {
             capabilities = capabilities,
         })
 
+        require("mason").setup()
+        require("mason-lspconfig").setup()
     end
 }
