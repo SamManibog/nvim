@@ -8,36 +8,36 @@ return {
         local conditions = require("heirline.conditions")
         local utils = require("heirline.utils")
         local function setup_colors()
-            local theme = require("kanagawa.colors").setup().theme
             return {
-                bg_1 = theme.ui.bg_p1,
-                bg_2 = theme.ui.bg_m1,
-                bg_3 = theme.ui.bg_dim,
-                fg_1 = theme.ui.fg_dim,
-                fg_2 = theme.ui.fg,
-                black = theme.term[1],
-                red = theme.term[2],
-                green = theme.term[3],
-                yellow = theme.term[4],
-                blue = theme.term[5],
-                magenta = theme.term[6],
-                cyan = theme.term[7],
-                white = theme.term[8],
-                bright_black = theme.term[9],
-                bright_red = theme.term[10],
-                bright_green = theme.term[11],
-                bright_yellow = theme.term[12],
-                bright_blue = theme.term[13],
-                bright_magenta = theme.term[14],
-                bright_cyan = theme.term[15],
-                bright_white = theme.term[16],
-                diag_warn = theme.diag.warning,
-                diag_error = theme.diag.error,
-                diag_hint = theme.diag.hint,
-                diag_info = theme.diag.info,
-                git_del = theme.diff.delete,
-                git_add = theme.diff.add,
-                git_change = theme.diff.change,
+                bg_1 = utils.get_highlight("StatusLine").bg,
+                bg_2 = utils.get_highlight("ColorColumn").bg,
+                fg_1 = utils.get_highlight("StatusLine").fg,
+                fg_2 = utils.get_highlight("Normal").fg,
+
+                black = vim.g["terminal_color_0"],
+                red = vim.g["terminal_color_1"],
+                green = vim.g["terminal_color_2"],
+                yellow = vim.g["terminal_color_3"],
+                blue = vim.g["terminal_color_4"],
+                magenta = vim.g["terminal_color_5"],
+                cyan = vim.g["terminal_color_6"],
+                white = vim.g["terminal_color_7"],
+                bright_black = vim.g["terminal_color_8"],
+                bright_red = vim.g["terminal_color_9"],
+                bright_green = vim.g["terminal_color_10"],
+                bright_yellow = vim.g["terminal_color_11"],
+                bright_blue = vim.g["terminal_color_12"],
+                bright_magenta = vim.g["terminal_color_13"],
+                bright_cyan = vim.g["terminal_color_14"],
+                bright_white = vim.g["terminal_color_15"],
+
+                diag_warn = utils.get_highlight("DiagnosticWarn").fg,
+                diag_error = utils.get_highlight("DiagnosticError").fg,
+                diag_hint = utils.get_highlight("DiagnosticHint").fg,
+                diag_info = utils.get_highlight("DiagnosticInfo").fg,
+                git_del = utils.get_highlight("diffDeleted").fg,
+                git_add = utils.get_highlight("diffAdded").fg,
+                git_change = utils.get_highlight("diffChanged").fg,
             }
         end
         require("heirline").load_colors(setup_colors)
@@ -128,7 +128,7 @@ return {
                 end),
             },
         }
-        ViMode = utils.surround({"█", "█"}, "bg_1", ViMode)
+        ViMode = utils.surround({"█", "█"}, "bg_2", ViMode)
 
         local FileNameBlock = {
             -- let's first set up some attributes needed by this component and its children
@@ -211,7 +211,7 @@ return {
             provider = function()
                 return string.lower(vim.bo.filetype) .. " "
             end,
-            hl = { fg = utils.get_highlight("Type").fg, bold = true },
+            hl = { fg = "fg_1", bold = true },
         }
 
         local FileEncoding = {
@@ -290,7 +290,7 @@ return {
         }
 
         local Ruler = {
-            hl = { fg = "bright_white" },
+            hl = { fg = "bg_2" },
             provider = function ()
                 local row = vim.api.nvim_win_get_cursor(0)[1] + 0.0
                 local totalRows = vim.fn.line('$') + 0.0
@@ -301,7 +301,7 @@ return {
             end
         }
 
-        Ruler = utils.surround({"█", "█"}, "bg_1", Ruler)
+        Ruler = utils.surround({"█", "█"}, "fg_1", Ruler)
 
         local MainRight = {
             --utils.surround({"",""}, "bg_2", ViMode),
@@ -316,7 +316,7 @@ return {
         }
 
         local DefaultStatusLine = {
-            hl = { bg = "bg_3" },
+            hl = { bg = "bg_1" },
             MainRight, Space,
             Align,
             LSPStatus, Space, MainLeft

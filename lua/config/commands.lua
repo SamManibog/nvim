@@ -1,7 +1,7 @@
 vim.api.nvim_create_user_command(
     "Light",
     function (_)
-        vim.cmd("colo kanagawa-lotus")
+        vim.cmd("set background=light")
     end,
     {
         nargs = 0,
@@ -12,7 +12,7 @@ vim.api.nvim_create_user_command(
 vim.api.nvim_create_user_command(
     "Dark",
     function (_)
-        vim.cmd("colo kanagawa-dragon")
+        vim.cmd("set background=dark")
     end,
     {
         nargs = 0,
