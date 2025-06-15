@@ -69,6 +69,12 @@ function M.isDirectory(path)
     return entry ~= nil and entry.type == "directory"
 end
 
+-- Check if the path is a valid executable
+function M.isExecutable(path)
+    local entry = vim.uv.fs_stat(path)
+    return entry ~= nil and vim.fn.executable(path) == 1
+end
+
 -- Run a command in the terminal emulator
 function M.runInTerminal(args)
     vim.cmd("tabnew")
@@ -88,6 +94,80 @@ function M.set_buf_opts(buf_id, opts)
                 buf = buf_id
             }
         )
+    end
+end
+
+---inserts found files into table
+---@param dir string
+---@param depth number
+---@param exes table
+---@param ignore { file: nil|(fun(path: string): boolean), directory: nil|(fun(path: string): boolean) }
+local function get_files_helper(dir, depth, exes, ignore)
+    local iter = vim.uv.fs_scandir(dir)
+    local name, type = vim.uv.fs_scandir_next(iter)
+    while name ~= nil do
+        if type == "directory"
+            and depth ~= 0
+            and not ignore.directory(dir .. "/" .. name)
+        then
+            get_files_helper(dir .. "/" .. name, depth - 1, exes, ignore)
+
+        elseif not ignore.file(dir .. "/" .. name) then
+            table.insert(
+                exes,
+                {
+                    name = name,
+                    full_path = dir .. "/" .. name,
+                }
+            )
+        end
+        name, type = vim.uv.fs_scandir_next(iter)
+    end
+end
+
+---Returns a table with all executables in a file tree (designed for cmake builds)
+---@param path string|nil   the first directory to search
+---@param depth number|nil  the depth to search, leave nil or negative to not limit depth
+---@param ignore {file: nil|(fun(path: string): boolean), directory: nil|(fun(path: string): boolean)} dont search files or directories for which these functions return true
+---@return { name: string, full_path: string, relative_path: string }[]
+function M.get_files(path, depth, ignore)
+    path = path or vim.fn.getcwd()
+    depth = depth or -1
+    ignore = ignore or {
+        file = function() return false end,
+        directory = function() return false end
+    }
+
+    local out = {}
+
+    if M.isDirectory(path) then
+        get_files_helper(path, depth, out, ignore)
+
+        for _, value in pairs(out) do
+            value.relative_path = string.sub(value.full_path, string.len(path) + 2)
+        end
+    end
+
+    return out
+end
+
+function test()
+    local exes = M.get_files(vim.fn.getcwd() .. "/build", nil,
+        {
+            file = function(path)
+                return not M.isExecutable(path)
+            end,
+            directory = function(path)
+                local name = vim.fn.fnamemodify(path, ":t")
+                return name == ".cmake" or name == "CMakeFiles"
+            end
+        }
+    )
+
+    for _, value in pairs(exes) do
+        print(value.name)
+        print("\trel path: " .. value.relative_path)
+        print("\tfull path: " .. value.full_path .. "\n")
     end
 end
 

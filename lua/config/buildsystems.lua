@@ -158,86 +158,47 @@ function M.recognizedBuildSystems()
     return list
 end
 
+--[[
 function M.closeMenu()
     if M.popup ~= nil then
         M.popup:close()
     end
     M.popup = nil
 end
-
-function M.runCommand(keybind)
-    local cmdList = M.currentBuildSystem.commands or nil
-    if cmdList ~= nil and cmdList[keybind] ~= nil then
-        cmdList[keybind].callback()
-    end
-    M.closeMenu()
-end
+]]
 
 function M.taskMenu()
-    --only one buildsystems menu should be active at a time
-    M.closeMenu()
-
     local current = M.currentBuildSystem
     if current == nil then
         print("There are no commands for the current buildsystem.")
-        M.popup = nil
         return
     end
 
     local commandList = current.commands or nil
     if commandList == nil then
         print("There are no commands for the current buildsystem.")
-        M.popup = nil
         return
     end
 
-    local menuText = {}
-
-    local height = 0
-    for keybind, command in pairs(commandList) do
-        table.insert(menuText, keybind .. " - " .. command.desc)
-        height = height + 1
+    local tasks = {}
+    for bind, command in pairs(commandList) do
+        table.insert(tasks, {
+            bind = bind,
+            desc = command.desc,
+            callback = command.callback
+        })
     end
 
-    if height == 0 then
-        print("There are no commands for the current buildsystem.")
-        return
-    end
-
-    local p = popup.new({
-        text = menuText,
-        title = "Tasks",
-        width = 30,
-        border = true,
-    })
-
-    for keybind, _ in pairs(commandList) do
-        vim.api.nvim_buf_set_keymap(
-            p:get_buf_id(),
-            "n",
-            keybind,
-            "",
-            {
-                silent = true,
-                callback = function()
-                    M.runCommand(keybind)
-                end
-            }
-        )
-    end
-
-    vim.api.nvim_buf_set_keymap(
-        p:get_buf_id(),
-        "n",
-        "q",
-        "",
+    popup.new_actions_menu(
+        tasks,
         {
-            silent = true,
-            callback = M.closeMenu
+            title = "Tasks",
+            text = {},
+            width = 30,
+            border = true,
+            closeBinds = { "<C-c>", "q" }
         }
     )
-
-    M.popup = p
 end
 
 vim.api.nvim_create_autocmd(

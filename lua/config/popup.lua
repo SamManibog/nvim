@@ -720,4 +720,102 @@ function M.new_input(opts)
     return base_popup
 end
 
+---@class ActionsMenuOpts
+---@field title string?         the title to display on the popup, useless if border is not true
+---@field width integer?        the minimum width excluding the border
+---@field height integer?       the minimum height excluding the border
+---@field border boolean?       border?
+---@field persistent boolean?   Whether or not the popup will persist once window has been exited
+---@field stayOpen boolean?     Whether or not the popup will persist (by default) when an action has been executed
+---@field closeBinds string[]?  A list of keybinds that will close the menu
+
+---@param actions { bind: string, desc: string, persist: boolean|nil, callback: function, [any]: any }[] a list of tables describing the available actions
+---@param opts ActionsMenuOpts the options for the given popup
+function M.new_actions_menu(actions, opts)
+    local menuText = {}
+
+    --determine max length of keybinds to allow right alignment
+    local keybind_length = 0
+    for _, action in pairs(actions) do
+        keybind_length = math.max(keybind_length, string.len(action.bind))
+    end
+
+    local height = 0
+    for _, action in pairs(actions) do
+        action.line_nr = height + 1
+        local padding = string.rep(" ", keybind_length - string.len(action.bind))
+        table.insert(menuText, padding .. action.bind .. " - " .. action.desc)
+
+        height = height + 1
+    end
+
+    --@type PopupOpts
+    local popupOpts = {
+        title = opts.title,
+        width = opts.width,
+        height = opts.height,
+        border = opts.border,
+        persistent = opts.persistent,
+
+        text = menuText,
+    }
+
+    popupOpts["text"] = menuText
+
+    local p = M.new(popupOpts)
+
+    for _, action in pairs(actions) do
+        if opts.stayOpen then
+            vim.api.nvim_buf_set_keymap(
+                p:get_buf_id(),
+                "n",
+                action.bind,
+                "",
+                {
+                    silent = true,
+                    callback = function()
+                        action.callback()
+                        if action.persist == false then
+                            p:close()
+                        end
+                    end
+                }
+            )
+        else
+            vim.api.nvim_buf_set_keymap(
+                p:get_buf_id(),
+                "n",
+                action.bind,
+                "",
+                {
+                    silent = true,
+                    callback = function()
+                        action.callback()
+                        if not action.persist then
+                            p:close()
+                        end
+                    end
+                }
+            )
+        end
+    end
+
+    if opts.closeBinds ~= nil then
+        for _, closer in pairs(opts.closeBinds) do
+            vim.api.nvim_buf_set_keymap(
+                p:get_buf_id(),
+                "n",
+                closer,
+                "",
+                {
+                    silent = true,
+                    callback = function() p:close() end
+                }
+            )
+        end
+    end
+
+    return p
+end
+
 return M
