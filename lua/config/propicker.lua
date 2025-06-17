@@ -1,5 +1,15 @@
 local M = {}
 
+local popup = require("config.popup")
+local utils = require("config.utils")
+
+--[===[
+--todo
+--add ability to create new project/new project menu
+    --add projects folder picker to specify which folder to use
+    --add template picker to chose a template
+    --add menu to enter opts, using either popup.new_input or popup.new_adv_input
+
 -----------------------------------------------------------------------------------
 ---Frontend
 -----------------------------------------------------------------------------------
@@ -15,17 +25,9 @@ M.templates = {
     }
 }
 
---todo
---add projects folder picker to specify which folder to use
---add template picker to chose a template
---add menu to enter opts, using either popup.new_input or popup.new_adv_input
-
 -----------------------------------------------------------------------------------
 ---Backend
 -----------------------------------------------------------------------------------
-
-local popup = require("config.popup")
-local utils = require("config.utils")
 
 ---@class DirEntry a representation of some sub directory
 ---@field name string the name of the file including possible extensions (but not the path)
@@ -102,37 +104,65 @@ end
 
 function M.new_project()
 end
+]===]
 
 --open the project menu
 function M.project_menu()
     --read environment variable for project folder
-    local projFoldersRaw = os.getenv("ProjectLocations")
-    if projFoldersRaw == nil then
-        print("'ProjectLocations' environment variable has not been set.\nThis is necessary to locate projects.")
+    local projFolderGroupsRaw = os.getenv("PRO_PICKER_DIR_LOCATIONS")
+    local projFoldersRaw = os.getenv("PRO_PICKER_LOCATIONS")
+    if projFoldersRaw == nil and projFolderGroupsRaw == nil then
+        print(
+            "'PRO_PICKER_DIR_LOCATIONS' and 'PRO_PICKER_LOCATIONS' environment variables have not been set."
+            .."\nThese are necessary to locate projects."
+            .."\n'PRO_PICKER_DIR_LOCATIONS' stores a semicolon delimited list of folders that contain many projects."
+            .."\n'PRO_PICKER_LOCATIONS' stores a semicolon delimited list individual project folders."
+        )
         return
     end
 
     --collect all project folders into a table (should be a ; separated list w/o quotes)
     local projects = {}
     local projectCount = 0
-    for path in (projFoldersRaw .. ";"):gmatch("([^;]*);") do
-        local tpath = utils.trim(path)
 
-        if utils.isDirectory(tpath) then
-            local iter = vim.uv.fs_scandir(tpath)
-            local name, type = vim.uv.fs_scandir_next(iter)
-            while name ~= nil do
-                if type == "directory" then
-                    local project = {}
-                    projectCount = projectCount + 1
-                    project.name = name
-                    project.path = tpath .. "/" .. name
-                    table.insert(projects, project)
+    --handle groups
+    if projFolderGroupsRaw ~= nil then
+        for path in (projFolderGroupsRaw .. ";"):gmatch("([^;]*);") do
+            local tpath = utils.trim(path)
+
+            if utils.isDirectory(tpath) then
+                local iter = vim.uv.fs_scandir(tpath)
+                local name, type = vim.uv.fs_scandir_next(iter)
+                while name ~= nil do
+                    if type == "directory" then
+                        local project = {}
+                        projectCount = projectCount + 1
+                        project.name = name
+                        project.path = tpath .. "/" .. name
+                        table.insert(projects, project)
+                    end
+                    name, type = vim.uv.fs_scandir_next(iter)
                 end
-                name, type = vim.uv.fs_scandir_next(iter)
+            elseif tpath ~= "" then
+                print(tpath .. " is not a valid project groups folder")
             end
-        else
-            print(tpath .. " is not a valid projects folder")
+        end
+    end
+
+    --handle individual projects
+    if projFoldersRaw ~= nil then
+        for path in (projFoldersRaw .. ";"):gmatch("([^;]*);") do
+            local tpath = utils.trim(path)
+
+            if utils.isDirectory(tpath) then
+                local project = {}
+                projectCount = projectCount + 1
+                project.name = vim.fn.fnamemodify(path, ":t")
+                project.path = tpath
+                table.insert(projects, project)
+            elseif tpath ~= "" then
+                print(tpath .. " is not a valid project folder")
+            end
         end
     end
 
@@ -148,7 +178,7 @@ function M.project_menu()
         index_map[index] = project.path
         index = index + 1
     end
-    table.insert(menuText, string.rep(" ", maxDigits - 1).."n - [new project]")
+    --table.insert(menuText, string.rep(" ", maxDigits - 1).."n - [new project]")
     table.insert(menuText, string.rep(" ", maxDigits - 1).."q - [exit]")
 
     local p
@@ -160,8 +190,8 @@ function M.project_menu()
         prompt = "> ",
         verify_input = function (text)
             if
-                text == "n"
-                or text == "q"
+                text == "q"
+                --or text == "n"
             then
                 return true
             end
@@ -176,10 +206,10 @@ function M.project_menu()
             end
         end,
         on_confirm = function (text)
-            if text == "n" then
-                print("todo")
-            elseif text == "q" or text == "0" then
+            if text == "q" or text == "0" then
                 p:close()
+            --elseif text == "n" then
+                --print("todo")
             else
                 local p_path = index_map[tonumber(text)]
                 p:close()

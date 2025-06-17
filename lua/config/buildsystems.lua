@@ -193,7 +193,6 @@ function M.taskMenu()
         tasks,
         {
             title = "Tasks",
-            text = {},
             width = 30,
             border = true,
             closeBinds = { "<C-c>", "q" }
