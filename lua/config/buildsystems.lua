@@ -200,19 +200,4 @@ function M.taskMenu()
     )
 end
 
-vim.api.nvim_create_autocmd(
-    'DirChanged',
-    {
-        pattern = 'global',
-        callback = M.refreshBuildSystem,
-    }
-)
-
-vim.api.nvim_create_autocmd(
-    'VimEnter',
-    {
-        callback =  M.refreshBuildSystem,
-    }
-)
-
 return M
