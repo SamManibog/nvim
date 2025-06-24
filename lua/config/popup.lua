@@ -729,7 +729,7 @@ end
 ---@field stayOpen boolean?     Whether or not the popup will persist (by default) when an action has been executed
 ---@field closeBinds string[]?  A list of keybinds that will close the menu
 
----@param actions { bind: string, desc: string, persist: boolean|nil, callback: function, [any]: any }[] a list of tables describing the available actions
+---@param actions { bind: string?, desc: string, persist: boolean|nil, callback: function, [any]: any }[] a list of tables describing the available actions
 ---@param opts ActionsMenuOpts the options for the given popup
 function M.new_actions_menu(actions, opts)
     local menuText = {}
@@ -737,14 +737,22 @@ function M.new_actions_menu(actions, opts)
     --determine max length of keybinds to allow right alignment
     local keybind_length = 0
     for _, action in pairs(actions) do
+        if action.bind == nil then break end
+
         keybind_length = math.max(keybind_length, string.len(action.bind))
     end
 
     local height = 0
     for _, action in pairs(actions) do
         action.line_nr = height + 1
-        local padding = string.rep(" ", keybind_length - string.len(action.bind))
-        table.insert(menuText, padding .. action.bind .. " - " .. action.desc)
+
+        if action.bind == nil then
+            local padding = string.rep(" ", keybind_length + 3)
+            table.insert(menuText, padding .. action.desc)
+        else
+            local padding = string.rep(" ", keybind_length - string.len(action.bind))
+            table.insert(menuText, padding .. action.bind .. " - " .. action.desc)
+        end
 
         height = height + 1
     end
@@ -765,6 +773,8 @@ function M.new_actions_menu(actions, opts)
     local p = M.new(popupOpts)
 
     for _, action in pairs(actions) do
+        if action.bind == nil then break end
+
         if opts.stayOpen then
             vim.api.nvim_buf_set_keymap(
                 p:get_buf_id(),

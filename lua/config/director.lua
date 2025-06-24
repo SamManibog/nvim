@@ -16,9 +16,11 @@ local function mkdir(path)
     end
 end
 
+-- action configuration
 local actionsData = {}
 
-M.actions = {}
+-- list of actions
+local actions = {}
 
 ---@class ActionDescriptor
 ---@field bind string the keybinding for the action
@@ -96,7 +98,10 @@ end
 ---@param binds string[] a list of all binds with data that must be loaded
 local function loadActionsData(binds)
     --exit early if there is no data to load
-    if #binds <= 0 then return end
+    do
+        local _, v = next(binds)
+        if v == nil then return end
+    end
 
     actionsData = {}
 
@@ -250,28 +255,22 @@ function M.setActionConfig(bind, label)
 end
 
 function M.refreshActions()
-    print("reffresh")
     --detect and load actions
     ---@type { [string]: ActionDescriptor }
-    M.actions = {}
+    actions = {}
     for _, action in pairs(config.actions) do
-        print("found " .. action.desc)
         --check if the action should exist for the current directory
         if action.detect() then
-            print("detected.")
             local actionPriority = action.priority or 0
 
             local existingPriority = -1
-            if M.actions[action.bind] ~= nil then
-                existingPriority = M.actions[action.bind].priority or 0
+            if actions[action.bind] ~= nil then
+                existingPriority = actions[action.bind].priority or 0
             end
 
-            print("existing priority: " .. existingPriority)
-            print("action priority: " .. actionPriority)
             --only add the action with the highest priority for the same bind
             if existingPriority < actionPriority then
-                print("added")
-                M.actions[action.bind] = action
+                actions[action.bind] = action
             end
         end
     end
@@ -279,7 +278,7 @@ function M.refreshActions()
     --load all relevant action config data
     ---@type string[]
     local configurables = {}
-    for _, action in pairs(M.actions) do
+    for _, action in pairs(actions) do
         if action.configurable then
             table.insert(configurables, action)
         end
@@ -288,14 +287,16 @@ function M.refreshActions()
 end
 
 function M.actionsMenu()
-    if M.actions == 0 then
-        print(M.actions)
-        print("No actions are valid for this directory.")
-        return
+    do
+        local _, v = next(actions)
+        if v == nil then
+            print("No actions are valid for this directory.")
+            return
+        end
     end
 
     local tasks = {}
-    for _, action in pairs(M.actions) do
+    for _, action in pairs(actions) do
         ---@type function
         local cb
 
@@ -326,11 +327,23 @@ function M.actionsMenu()
     )
 end
 
+function M.actionConfigMenu()
+    do
+        local _, v = next(actionsData)
+        if v == nil then
+            print("No actions are configurable in this directory.")
+            return
+        end
+    end
+
+
+end
+
 local function detectCmake()
-    return vim.fn.filereadable(vim.fn.getcwd().."/CMakeLists.txt")
+    return vim.fn.filereadable(vim.fn.getcwd().."/CMakeLists.txt") == 1
 end
 local function detectCargo()
-    return vim.fn.filereadable(vim.fn.getcwd().. "/Cargo.toml")
+    return vim.fn.filereadable(vim.fn.getcwd().. "/Cargo.toml") == 1
 end
 
 M.setup({
