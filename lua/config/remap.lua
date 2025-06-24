@@ -1,5 +1,4 @@
 local util = require("config.utils")
-local bs = require("config.buildsystems")
 
 vim.g.mapleader = " "
 vim.keymap.set("n", "<leader>pv", vim.cmd.Explore)
@@ -94,8 +93,9 @@ vim.keymap.set(
 )
 
 --buildsystem menu
+local bs = require("config.director")
 vim.keymap.set(
     "n",
     "<leader>b",
-    bs.taskMenu
+    bs.actionsMenu
 )

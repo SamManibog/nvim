@@ -11,18 +11,20 @@ local utils = require("config.utils")
 ---creates a directory at the given path if it doesn't already exist
 ---@param path string the path at which to make the directory (no parents created)
 local function mkdir(path)
-    if not utils.isDirectory(path) then
+    if not vim.fn.isdirectory(path) then
         vim.uv.fs_mkdir(path, tonumber("777", 8))
     end
 end
 
 local actionsData = {}
 
+M.actions = {}
+
 ---@class ActionDescriptor
 ---@field bind string the keybinding for the action
 ---@field desc string the displayed discription of the action
 ---@field callback fun(data: table?) the function to call when the action is used
----@field type string? the type of data that needs to be loaded for the action
+---@field configurable boolean? whether or not a configuration table can be passed to the callback
 ---@field detect (fun(): boolean)? the function ran to detect if the action is available (always available if nil)
 ---@field priority number? if keybinds conflict, the action with the higher priority is used (default 0)
 
@@ -62,10 +64,10 @@ function M.setup(opts)
 
 end
 
----saves the data for the given action type
----@param type string
-local function saveActionsData(type)
-    if actionsData[type] == nil then return end
+---saves the data for the given action bind
+---@param bind string
+local function saveActionsData(bind)
+    if actionsData[bind] == nil then return end
 
     ---@type string
     local dataPath = vim.fn.stdpath("data") .. "/director"
@@ -77,30 +79,30 @@ local function saveActionsData(type)
     local folderName = vim.fn.json_decode(vim.fn.readfile(manifestPath))[vim.fn.getcwd()]
 
     ---@type string
-    local typePath = dataPath .. "/" .. folderName .. "/" .. type .. ".json"
+    local bindPath = dataPath .. "/" .. folderName .. "/" .. bind .. ".json"
 
     ---@type file*?
-    local typeFile = io.open(typePath, "w")
-    if typeFile ~= nil then
-        typeFile:write(vim.fn.json_encode(actionsData[type]))
-        typeFile:close()
+    local bindFile = io.open(bindPath, "w")
+    if bindFile ~= nil then
+        bindFile:write(vim.fn.json_encode(actionsData[bind]))
+        bindFile:close()
     else
-        print("unable to write to file: " .. typePath)
+        print("unable to write to file: " .. bindPath)
     end
 end
 
----loads action data for the given directory and types into memory (actionsData variable),
+---loads action data for the given directory and binds into memory (actionsData variable),
 ---writing files to disk if necessary
----@param types string[] a list of all action data types that must be loaded
-local function loadActionsData(types)
+---@param binds string[] a list of all binds with data that must be loaded
+local function loadActionsData(binds)
     --exit early if there is no data to load
-    if #types <= 0 then return end
+    if #binds <= 0 then return end
 
     actionsData = {}
 
     if not config.preserve then
-        for _, type in pairs(types) do
-            actionsData[type] = {
+        for _, bind in pairs(binds) do
+            actionsData[bind] = {
                 actions = {}
             }
         end
@@ -171,89 +173,92 @@ local function loadActionsData(types)
     local actionsPath = dataPath .. "/" .. folderName
     mkdir(actionsPath)
 
-    --for action data of each type...
-    for _, type in pairs(types) do
-        local typePath = actionsPath .. "/" .. type .. ".json"
+    --for action data of each bind...
+    for _, bind in pairs(binds) do
+        local bindPath = actionsPath .. "/" .. bind .. ".json"
 
         --check if data is readable
-        if vim.fn.filereadable(typePath) then
+        if vim.fn.filereadable(bindPath) then
             --read the file into memory
-            actionsData[type] = vim.fn.json_decode(vim.fn.readfile(typePath))
+            actionsData[bind] = vim.fn.json_decode(vim.fn.readfile(bindPath))
 
         else
             --if data is not readable, create a new file
-            local typeFile = io.open(typePath, "w")
-            if typeFile ~= nil then
-                typeFile:write(vim.fn.json_encode({
+            local bindFile = io.open(bindPath, "w")
+            if bindFile ~= nil then
+                bindFile:write(vim.fn.json_encode({
                     actions = {}
                 }))
-                typeFile:close()
+                bindFile:close()
             else
-                print("unable to write to file: " .. typePath)
+                print("unable to write to file: " .. bindPath)
             end
 
-            actionsData[type] = { actions = {} }
+            actionsData[bind] = { actions = {} }
         end
     end
 end
 
----adds or edits an action configuration for the given type
----@param type string the type of action to add a config for
+---adds or edits an action configuration for the given bind
+---@param bind string the bind of action to add a config for
 ---@param label string the label for the action
 ---@param data table the configuration to store
-function M.makeActionConfig(type, label, data)
-    if actionsData[type] == nil then
-        error("Action type '" .. type .. "' does not exist for this directory.")
+function M.makeActionConfig(bind, label, data)
+    if actionsData[bind] == nil then
+        error("Action bind '" .. bind .. "' is not configurable for this directory.")
     end
 
-    actionsData[type].actions[label] = data
+    actionsData[bind].actions[label] = data
 
     if config.preserve then
-        saveActionsData(type)
+        saveActionsData(bind)
     end
 end
 
----removes an action configuration for the given type
----@param type string the type of action to remove
----@param label string the label of the action to remove
-function M.removeActionConfig(type, label)
-    if actionsData[type] == nil then
-        error("Action type '" .. type .. "' does not exist for this directory.")
+---removes an action configuration for the given bind
+---@param bind string the bind at which to remove a configuration
+---@param label string the label of the action config to remove
+function M.removeActionConfig(bind, label)
+    if actionsData[bind] == nil then
+        error("Action bind '" .. bind .. "' is not configurable for this directory.")
     end
 
-    actionsData[type].actions[label] = nil
+    actionsData[bind].actions[label] = nil
 
     if config.preserve then
-        saveActionsData(type)
+        saveActionsData(bind)
     end
 end
 
----sets the current action for the given type
----@param type string the type of action to set
+---sets the current action config for the given bind 
+---@param bind string the bind of action to set
 ---@param label string the label of the action to set
-function M.setActionConfig(type, label)
-    if actionsData[type] == nil then
-        error("Action type '" .. type .. "' does not exist for this directory.")
+function M.setActionConfig(bind, label)
+    if actionsData[bind] == nil then
+        error("Action bind '" .. bind .. "' is not configurable for this directory.")
     end
 
-    if actionsData[type][label] == nil then
-        error("Action '" .. label .. "' in '" .. type .. "' does not exist for this directory.")
+    if actionsData[bind][label] == nil then
+        error("Action bind '" .. bind .. "' does not have a config '" .. label "'")
     end
 
-    actionsData[type].current = label
+    actionsData[bind].current = label
 
     if config.preserve then
-        saveActionsData(type)
+        saveActionsData(bind)
     end
 end
 
 function M.refreshActions()
+    print("reffresh")
     --detect and load actions
     ---@type { [string]: ActionDescriptor }
     M.actions = {}
     for _, action in pairs(config.actions) do
+        print("found " .. action.desc)
         --check if the action should exist for the current directory
         if action.detect() then
+            print("detected.")
             local actionPriority = action.priority or 0
 
             local existingPriority = -1
@@ -261,8 +266,11 @@ function M.refreshActions()
                 existingPriority = M.actions[action.bind].priority or 0
             end
 
+            print("existing priority: " .. existingPriority)
+            print("action priority: " .. actionPriority)
             --only add the action with the highest priority for the same bind
             if existingPriority < actionPriority then
+                print("added")
                 M.actions[action.bind] = action
             end
         end
@@ -270,22 +278,19 @@ function M.refreshActions()
 
     --load all relevant action config data
     ---@type string[]
-    local requiredTypes = {}
-    local typeSet = {}
+    local configurables = {}
     for _, action in pairs(M.actions) do
-        if action.type ~= nil then
-            typeSet[action.type] = true
+        if action.configurable then
+            table.insert(configurables, action)
         end
     end
-    for type, _ in pairs(typeSet) do
-        table.insert(M.requiredTypes, type)
-    end
-    loadActionsData(requiredTypes)
+    loadActionsData(configurables)
 end
 
 function M.actionsMenu()
-    if #M.actions == 0 then
-        print("No Actions are Valid for this Directory")
+    if M.actions == 0 then
+        print(M.actions)
+        print("No actions are valid for this directory.")
         return
     end
 
@@ -294,13 +299,13 @@ function M.actionsMenu()
         ---@type function
         local cb
 
-        if action.type == nil then
-            cb = action.callback
-        else
+        if action.configurable then
             local thisData = actionsData[vim.fn.getcwd()][action]
             cb = function()
-                action.callback(actionsData[action.type].actions[actionsData[action.type].current])
+                action.callback(actionsData[action.bind].actions[actionsData[action.bind].current])
             end
+        else
+            cb = action.callback
         end
 
         table.insert(tasks, {
@@ -321,17 +326,130 @@ function M.actionsMenu()
     )
 end
 
-M.setup({})
+local function detectCmake()
+    return vim.fn.filereadable(vim.fn.getcwd().."/CMakeLists.txt")
+end
+local function detectCargo()
+    return vim.fn.filereadable(vim.fn.getcwd().. "/Cargo.toml")
+end
 
-vim.api.nvim_create_user_command(
-    "Test",
-    function(_)
-        M.actionsMenu()
-    end,
-    {
-        nargs = 0,
-        desc = "Refreshes the current buildsystem",
+M.setup({
+    ---@type ActionDescriptor[]
+    actions = {
+        --cargo buildsystem
+        {
+            bind = "cc",
+            desc = "Compile",
+            detect = detectCargo,
+            callback = function() utils.runInTerminal("cargo build") end
+        },
+        {
+            bind = "r",
+            desc = "Run",
+            detect = detectCargo,
+            callback = function() utils.runInTerminal("cargo run") end
+        },
+
+        --cmake buildsystem
+        {
+            bind = "cc",
+            desc = "Compile",
+            detect = detectCmake,
+            callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build")
+            end
+        },
+        {
+            bind = "b",
+            desc = "Build",
+            detect = detectCmake,
+            callback = function ()
+                if utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_rmdir(vim.fn.getcwd().."/build")
+                end
+                utils.runInTerminal("cmake --preset=debug -B build -S .")
+            end
+        },
+        {
+            bind = "r",
+            desc = "Run",
+            detect = detectCmake,
+            callback = function ()
+                utils.runInTerminal("\"./build/main.exe\"")
+            end
+        },
+        {
+            bind = "cr",
+            desc = "Compile and Run",
+            detect = detectCmake,
+            callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build && \"./build/main.exe\"")
+            end
+        },
+        {
+            bind = "ts",
+            desc = "Test (Silent)",
+            detect = detectCmake,
+            callback = function ()
+                utils.runInTerminal("cd build && ctest")
+            end
+        },
+        {
+            bind = "tl",
+            desc = "Test (Verbose)",
+            detect = detectCmake,
+            callback = function ()
+                utils.runInTerminal("cd build && ctest --verbose")
+            end
+        },
+        {
+            bind = "cts",
+            desc = "Compile and Test (Silent)",
+            detect = detectCmake,
+            callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build && cd build && ctest")
+            end
+        },
+        {
+            bind = "ctl",
+            desc = "Compile and Test (Verbose)",
+            detect = detectCmake,
+            callback = function ()
+                if not utils.isDirectory(vim.fn.getcwd().."/build") then
+                    vim.uv.fs_mkdir(vim.fn.getcwd().."/build", tonumber("777", 8))
+                end
+                utils.runInTerminal("cmake --build build && cd build && ctest --verbose")
+            end
+        },
+        {
+            bind = "I",
+            desc = "Install as Package",
+            detect = detectCmake,
+            callback = function ()
+                local package_folder = os.getenv("CMakePackagePath")
+                if package_folder == nil then
+                    print("CMakePackagePath environment variable must be set")
+                end
+                if utils.isDirectoryEntry(package_folder) then
+                    if utils.isDirectory(vim.fn.getcwd().."/build") then
+                        vim.uv.fs_rmdir(vim.fn.getcwd().."/build")
+                    end
+                    utils.runInTerminal([[cmake -G "MinGW Makefiles" -B build -S . -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --install-prefix "C:\Users\sfman\Packages\Installed" && cmake --build build && cmake --install build --config Debug]])
+                else
+                    print(package_folder.." is not a valid directory")
+                end
+            end,
+        },
     }
-)
+})
 
 return M

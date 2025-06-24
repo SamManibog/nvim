@@ -4,8 +4,9 @@ require("config.set")
 require("config.commands")
 
 require("config.propicker")
-require("config.buildsystems")
 require("config.director")
+
+--require("config.buildsystems")
 
 -- Set color scheme
 vim.cmd.colorscheme("gruvbox")
