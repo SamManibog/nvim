@@ -322,7 +322,8 @@ function M.actionsMenu()
             title = "Actions",
             width = 30,
             border = true,
-            closeBinds = { "<C-c>" }
+            closeBinds = { "<C-c>" },
+            selectBinds = { "<CR>", "<Space>" }
         }
     )
 end

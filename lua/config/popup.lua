@@ -726,8 +726,9 @@ end
 ---@field height integer?       the minimum height excluding the border
 ---@field border boolean?       border?
 ---@field persistent boolean?   Whether or not the popup will persist once window has been exited
----@field stayOpen boolean?     Whether or not the popup will persist (by default) when an action has been executed
+---@field stayOpen boolean?     Whether or not the popup will persist by default when an action has been executed
 ---@field closeBinds string[]?  A list of keybinds that will close the menu
+---@field selectBinds string[]?  A list of keybinds that will run the highlighted action
 
 ---@param actions { bind: string?, desc: string, persist: boolean|nil, callback: function, [any]: any }[] a list of tables describing the available actions
 ---@param opts ActionsMenuOpts the options for the given popup
@@ -743,8 +744,12 @@ function M.new_actions_menu(actions, opts)
     end
 
     local height = 0
+    local actionList = {}
     for _, action in pairs(actions) do
-        action.line_nr = height + 1
+        table.insert(actionList, {
+            callback = action.callback,
+            persist = action.persist
+        })
 
         if action.bind == nil then
             local padding = string.rep(" ", keybind_length + 3)
@@ -772,42 +777,47 @@ function M.new_actions_menu(actions, opts)
 
     local p = M.new(popupOpts)
 
+    local ns = vim.api.nvim_create_namespace("onup_menu")
+
+    vim.api.nvim_set_option_value(
+        "cursorline",
+        true,
+        {
+           win = p:get_win_id()
+        }
+    )
+
+    vim.api.nvim_set_hl(
+        ns,
+        "CursorLine",
+        { link = "Visual" }
+    )
+
+    vim.api.nvim_win_set_hl_ns(p:get_win_id(), ns)
+
     for _, action in pairs(actions) do
         if action.bind == nil then break end
 
-        if opts.stayOpen then
-            vim.api.nvim_buf_set_keymap(
-                p:get_buf_id(),
-                "n",
-                action.bind,
-                "",
-                {
-                    silent = true,
-                    callback = function()
-                        action.callback()
-                        if action.persist == false then
-                            p:close()
-                        end
+        vim.api.nvim_buf_set_keymap(
+            p:get_buf_id(),
+            "n",
+            action.bind,
+            "",
+            {
+                silent = true,
+                callback = function()
+                    action.callback()
+
+                    local shouldClose = true
+                    if opts.stayOpen == true then shouldClose = false end
+                    if action.persist ~= nil then shouldClose = not action.persist end
+
+                    if shouldClose then
+                        p:close()
                     end
-                }
-            )
-        else
-            vim.api.nvim_buf_set_keymap(
-                p:get_buf_id(),
-                "n",
-                action.bind,
-                "",
-                {
-                    silent = true,
-                    callback = function()
-                        action.callback()
-                        if not action.persist then
-                            p:close()
-                        end
-                    end
-                }
-            )
-        end
+                end
+            }
+        )
     end
 
     if opts.closeBinds ~= nil then
@@ -820,6 +830,32 @@ function M.new_actions_menu(actions, opts)
                 {
                     silent = true,
                     callback = function() p:close() end
+                }
+            )
+        end
+    end
+
+    if opts.selectBinds ~= nil then
+        for _, selector in pairs(opts.selectBinds) do
+            vim.api.nvim_buf_set_keymap(
+                p:get_buf_id(),
+                "n",
+                selector,
+                "",
+                {
+                    silent = true,
+                    callback = function()
+                        local action = actionList[vim.api.nvim_win_get_cursor(0)[1]]
+                        action.callback()
+
+                        local shouldClose = true
+                        if opts.stayOpen == true then shouldClose = false end
+                        if action.persist ~= nil then shouldClose = not action.persist end
+
+                        if shouldClose then
+                            p:close()
+                        end
+                    end
                 }
             )
         end
