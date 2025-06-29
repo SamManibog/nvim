@@ -189,14 +189,15 @@ function M.taskMenu()
         })
     end
 
-    popup.new_actions_menu(
+    popup.new_options_menu(
         tasks,
         {
             title = "Tasks",
             width = 30,
             border = true,
             closeBinds = { "<C-c>", "q" }
-        }
+        },
+        true
     )
 end
 

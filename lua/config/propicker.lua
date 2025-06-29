@@ -1,6 +1,6 @@
 local M = {}
 
-local popup = require("config.popup")
+local InputPopup = require("oneup.input_popup")
 local utils = require("config.utils")
 
 --[===[
@@ -182,7 +182,7 @@ function M.project_menu()
     table.insert(menuText, string.rep(" ", maxDigits - 1).."q - [exit]")
 
     local p
-    p = popup.new_input({
+    p = InputPopup:new({
         text = menuText,
         title = "Projects",
         width = 30,
@@ -228,7 +228,7 @@ function M.project_menu()
                 )
             end
         end
-    })
+    }, true)
 
     M.popup = p
 end

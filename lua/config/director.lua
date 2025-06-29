@@ -1,6 +1,6 @@
 local M = {}
 
-local popup = require("config.popup")
+local oneup = require("oneup.oneup")
 local utils = require("config.utils")
 
 ---@diagnostic disable: unused-function, unused-local
@@ -16,27 +16,82 @@ local function mkdir(path)
     end
 end
 
+---@class ActionDescriptor
+---@field bind string                   the keybinding for the action
+---@field desc string                   the displayed discription of the action
+---@field callback fun(data: table?)    the function to call when the action is used
+---@field configure_type string?        the configuration type of the action valid options are defined by action_types in config
+---@field detect (fun(): boolean)?      the function ran to detect if the action is available (always available if nil)
+---@field priority number?              if keybinds conflict, the action with the higher priority is used (default 0)
+
+---@class ActionConfigField
+---@field name string                                   the name of the field
+---@field is_list boolean?                              whether or not the field is a list or a string
+---@field default (fun(): string[]) | string[] | nil    function to get the default value of the field when creating a new config
+
+---@class DirectorBindsConfig
+---@field confirm string[]      a list of binds used to confirm a selection
+---@field edit string[]        a list of binds used to edit a given field
+---@field new_config string[]   a list of binds used to create a new action configuration
+---@field cancel string[]       a list of binds used to return to the previous menu (or close the menu)
+
+---@class DirectorConfig
+---@field preserve boolean                              whether or not to save in-editor configuration to disk
+---@field action_types {[string]: ActionConfigField[]}  a dictionary of action_types which may be configured in-editor
+---@field binds DirectorBindsConfig                     binds for menus
+---@field actions ActionDescriptor[]                    a list of action descriptors that may be used
+
 -- action configuration
 local actionsData = {}
 
 -- list of actions
 local actions = {}
 
----@class ActionDescriptor
----@field bind string the keybinding for the action
----@field desc string the displayed discription of the action
----@field callback fun(data: table?) the function to call when the action is used
----@field configurable boolean? whether or not a configuration table can be passed to the callback
----@field detect (fun(): boolean)? the function ran to detect if the action is available (always available if nil)
----@field priority number? if keybinds conflict, the action with the higher priority is used (default 0)
-
----@class DirectorConfig
----@field preserve boolean whether or not to save in-editor configuration to disk
----@field actions ActionDescriptor[] a list of action descriptors that may be used
-
 ---@type DirectorConfig
 local default = {
     preserve = true,
+    action_types = {
+        execute = {
+            {
+                name = "path",
+                default = function()
+                    return { vim.fn.expand("%:p") }
+                end
+            },
+            {
+                name = "args",
+                is_list = true
+            }
+        },
+        compile = {
+            {
+                name = "target"
+            },
+            {
+                name = "args",
+                is_list = true
+            }
+        },
+        ctest = {
+            {
+                name = "target"
+            },
+            {
+                name = "tester args",
+                is_list = true
+            },
+            {
+                name = "exec args",
+                is_list = true
+            }
+        }
+    },
+    binds = {
+        confirm = { "<CR>", "<Space>" },
+        edit = { "<C-e>" },
+        new_config = { "i", "I", "a", "A", "o", "O" },
+        cancel = { "q",  "<C-c>", "<Esc>" },
+    },
     actions = {}
 }
 
@@ -95,19 +150,19 @@ end
 
 ---loads action data for the given directory and binds into memory (actionsData variable),
 ---writing files to disk if necessary
----@param binds string[] a list of all binds with data that must be loaded
-local function loadActionsData(binds)
+---@param configure_types string[] a list of all configuration types that must be loaded
+local function loadActionsData(configure_types)
     --exit early if there is no data to load
     do
-        local _, v = next(binds)
+        local _, v = next(configure_types)
         if v == nil then return end
     end
 
     actionsData = {}
 
     if not config.preserve then
-        for _, bind in pairs(binds) do
-            actionsData[bind] = {
+        for _, config_type in pairs(configure_types) do
+            actionsData[config_type] = {
                 actions = {}
             }
         end
@@ -178,28 +233,28 @@ local function loadActionsData(binds)
     local actionsPath = dataPath .. "/" .. folderName
     mkdir(actionsPath)
 
-    --for action data of each bind...
-    for _, bind in pairs(binds) do
-        local bindPath = actionsPath .. "/" .. bind .. ".json"
+    --for action data of each type...
+    for _, config_type in pairs(configure_types) do
+        local typePath = actionsPath .. "/" .. config_type .. ".json"
 
         --check if data is readable
-        if vim.fn.filereadable(bindPath) then
+        if vim.fn.filereadable(typePath) then
             --read the file into memory
-            actionsData[bind] = vim.fn.json_decode(vim.fn.readfile(bindPath))
+            actionsData[typePath] = vim.fn.json_decode(vim.fn.readfile(typePath))
 
         else
             --if data is not readable, create a new file
-            local bindFile = io.open(bindPath, "w")
+            local bindFile = io.open(typePath, "w")
             if bindFile ~= nil then
                 bindFile:write(vim.fn.json_encode({
                     actions = {}
                 }))
                 bindFile:close()
             else
-                print("unable to write to file: " .. bindPath)
+                print("unable to write to file: " .. typePath)
             end
 
-            actionsData[bind] = { actions = {} }
+            actionsData[config_type] = { actions = {} }
         end
     end
 end
@@ -277,13 +332,13 @@ function M.refreshActions()
 
     --load all relevant action config data
     ---@type string[]
-    local configurables = {}
+    local configure_types = {}
     for _, action in pairs(actions) do
-        if action.configurable then
-            table.insert(configurables, action)
+        if action.configure_type ~= nil then
+            table.insert(configure_types, action.configure_type)
         end
     end
-    loadActionsData(configurables)
+    loadActionsData(configure_types)
 end
 
 function M.actionsMenu()
@@ -316,16 +371,32 @@ function M.actionsMenu()
         })
     end
 
-    popup.new_actions_menu(
+    local menu = oneup.new_options_menu(
         tasks,
         {
             title = "Actions",
             width = 30,
             border = true,
-            closeBinds = { "<C-c>" },
-            selectBinds = { "<CR>", "<Space>" }
-        }
+            closeBinds = config.binds.cancel,
+            selectBinds = config.binds.confirm,
+        },
+        true
     )
+
+    for _, bind in pairs(config.binds.edit) do
+        vim.api.nvim_buf_set_keymap(
+            menu:get_buf_id(),
+            "n",
+            bind,
+            "",
+            {
+                callback = function()
+                    local row = vim.api.nvim_win_get_cursor(0)[1]
+                end
+            }
+        )
+    end
+
 end
 
 function M.actionConfigMenu()
@@ -465,5 +536,45 @@ M.setup({
         },
     }
 })
+
+vim.api.nvim_create_user_command(
+    "Test",
+    function (_)
+        oneup.new_options_preview_menu(
+            --actions
+            {
+                {
+                    desc = "action 1",
+                    callback = function() print("action 1") end,
+                    preview = { "action 1 l1", "action 1 l2", "action 1 l3" }
+                },
+                {
+                    desc = "action 2",
+                    callback = function() print("action 2") end,
+                    preview = function() return { "action 2 l1", "action 2 l2" } end
+                },
+                {
+                    desc = "action 3",
+                    callback = function() print("action 3") end,
+                    preview = { "action 3 l1" }
+                },
+            },
+            --opts
+            {
+                height = 30,
+                menu_width = 20,
+                preview_width = 50,
+                menu_title = "menu",
+                preview_title = "preview",
+            },
+            true
+        )
+    end,
+    {
+        nargs = 0,
+        desc = "sets colors to light theme",
+    }
+)
+
 
 return M
