@@ -82,21 +82,6 @@ function M.runInTerminal(args)
     pcall(vim.cmd, "startinsert")
 end
 
----Sets a options from a table for a given buffer
----@param buf_id number
----@param opts table
-function M.set_buf_opts(buf_id, opts)
-    for option, value in pairs(opts) do
-        vim.api.nvim_set_option_value(
-            option,
-            value,
-            {
-                buf = buf_id
-            }
-        )
-    end
-end
-
 ---inserts found files into table
 ---@param dir string
 ---@param depth number
@@ -129,7 +114,7 @@ end
 ---@param path string|nil   the first directory to search
 ---@param depth number|nil  the depth to search, leave nil or negative to not limit depth
 ---@param ignore {file: nil|(fun(path: string): boolean), directory: nil|(fun(path: string): boolean)} dont search files or directories for which these functions return true
----@return { name: string, full_path: string, relative_path: string }[]
+---@return { name: string, full_path: string, relative_path: string }[] name is the
 function M.get_files(path, depth, ignore)
     path = path or vim.fn.getcwd()
     depth = depth or -1
@@ -149,26 +134,6 @@ function M.get_files(path, depth, ignore)
     end
 
     return out
-end
-
-function test()
-    local exes = M.get_files(vim.fn.getcwd() .. "/build", nil,
-        {
-            file = function(path)
-                return not M.isExecutable(path)
-            end,
-            directory = function(path)
-                local name = vim.fn.fnamemodify(path, ":t")
-                return name == ".cmake" or name == "CMakeFiles"
-            end
-        }
-    )
-
-    for _, value in pairs(exes) do
-        print(value.name)
-        print("\trel path: " .. value.relative_path)
-        print("\tfull path: " .. value.full_path .. "\n")
-    end
 end
 
 return M

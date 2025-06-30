@@ -178,23 +178,16 @@ function M.project_menu()
         index_map[index] = project.path
         index = index + 1
     end
-    --table.insert(menuText, string.rep(" ", maxDigits - 1).."n - [new project]")
-    table.insert(menuText, string.rep(" ", maxDigits - 1).."q - [exit]")
 
     local p
     p = InputPopup:new({
         text = menuText,
         title = "Projects",
-        width = 30,
+        width = "20%",
+        min_width = 20,
         border = true,
         prompt = "> ",
         verify_input = function (text)
-            if
-                text == "q"
-                --or text == "n"
-            then
-                return true
-            end
             local p_index = tonumber(text)
             if
                 p_index == nil
@@ -206,27 +199,21 @@ function M.project_menu()
             end
         end,
         on_confirm = function (text)
-            if text == "q" or text == "0" then
-                p:close()
-            --elseif text == "n" then
-                --print("todo")
-            else
-                local p_path = index_map[tonumber(text)]
-                p:close()
-                vim.cmd("cd "..p_path)
-                vim.cmd("e "..p_path)
-                --ModeChanged is not emitted properly without this
-                vim.api.nvim_feedkeys(
-                    vim.api.nvim_replace_termcodes(
-                        ":<BS>",
-                            true,
-                            false,
-                            true
-                    ),
-                    'n',
-                    false
-                )
-            end
+            local p_path = index_map[tonumber(text)]
+            p:close()
+            vim.cmd("cd "..p_path)
+            vim.cmd("e "..p_path)
+            --ModeChanged is not emitted properly without this
+            vim.api.nvim_feedkeys(
+                vim.api.nvim_replace_termcodes(
+                    ":<BS>",
+                    true,
+                    false,
+                    true
+                ),
+                'n',
+                false
+            )
         end
     }, true)
 

@@ -384,17 +384,9 @@ function M.actionsMenu()
     )
 
     for _, bind in pairs(config.binds.edit) do
-        vim.api.nvim_buf_set_keymap(
-            menu:get_buf_id(),
-            "n",
-            bind,
-            "",
-            {
-                callback = function()
-                    local row = vim.api.nvim_win_get_cursor(0)[1]
-                end
-            }
-        )
+        menu:set_keymap("n", bind, function()
+            local row = vim.api.nvim_win_get_cursor(0)[1]
+        end)
     end
 
 end
