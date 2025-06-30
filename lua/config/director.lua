@@ -3,8 +3,6 @@ local M = {}
 local OptionsPopup = require("oneup.options_popup")
 local utils = require("config.utils")
 
----@diagnostic disable: unused-function, unused-local
-
 ----------------------------------------------------------------
 --utils
 ----------------------------------------------------------------
@@ -90,7 +88,7 @@ local default = {
         confirm = { "<CR>", "<Space>" },
         edit = { "<C-e>" },
         new_config = { "i", "I", "a", "A", "o", "O" },
-        cancel = { "q",  "<C-c>", "<Esc>" },
+        cancel = { "<C-c>", "<Esc>" },
     },
     actions = {}
 }
@@ -350,8 +348,6 @@ function M.actionsMenu()
         end
     end
 
-    local action_options = {}
-
     --perform calculations for bind annotations
     local maxBindLength = 0
     local hyphen = ""
@@ -371,16 +367,12 @@ function M.actionsMenu()
         local callback
 
         if action.configurable then
-            local thisData = actionsData[vim.fn.getcwd()][action]
             callback = function()
                 action.callback(actionsData[action.bind].actions[actionsData[action.bind].current])
             end
         else
             callback = action.callback
         end
-
-        local bindLength = 0
-        if action.bind ~= nil then bindLength = #action.bind end
 
         local text
         if action.bind == nil then
@@ -412,15 +404,20 @@ function M.actionsMenu()
         true
     )
 
-    for _, binded in pairs(bindedActions) do
-        menu:set_keymap("n", binded.bind, binded.callback)
-    end
-
     for _, bind in pairs(config.binds.confirm) do
         menu:set_keymap("n", bind, function()
             menu:get_option().callback()
         end)
     end
+
+    for _, bind in pairs(config.binds.cancel) do
+        menu:set_keymap("n", bind, function() menu:close() end)
+    end
+
+    for _, binded in pairs(bindedActions) do
+        menu:set_keymap("n", binded.bind, binded.callback)
+    end
+
 end
 
 function M.actionConfigMenu()
