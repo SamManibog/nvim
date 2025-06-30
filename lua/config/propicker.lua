@@ -1,6 +1,6 @@
 local M = {}
 
-local InputPopup = require("oneup.input_popup")
+local PromptPopup = require("oneup.prompt_popup")
 local utils = require("config.utils")
 
 --[===[
@@ -180,7 +180,7 @@ function M.project_menu()
     end
 
     local p
-    p = InputPopup:new({
+    p = PromptPopup:new({
         text = menuText,
         title = "Projects",
         width = "20%",

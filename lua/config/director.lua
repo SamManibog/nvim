@@ -1,6 +1,6 @@
 local M = {}
 
-local oneup = require("oneup.oneup")
+local OptionsPopup = require("oneup.options_popup")
 local utils = require("config.utils")
 
 ---@diagnostic disable: unused-function, unused-local
@@ -350,45 +350,77 @@ function M.actionsMenu()
         end
     end
 
-    local tasks = {}
+    local action_options = {}
+
+    --perform calculations for bind annotations
+    local maxBindLength = 0
+    local hyphen = ""
+    for _, action in pairs(actions) do
+        if action.bind == nil then break end
+        maxBindLength = math.max(maxBindLength, #action.bind)
+    end
+
+    if maxBindLength > 0 then hyphen = " - " end
+
+    ---@type { callback: function, bind: string }[]
+    local bindedActions = {}
+    ---@type Option[]
+    local actionOptions = {}
     for _, action in pairs(actions) do
         ---@type function
-        local cb
+        local callback
 
         if action.configurable then
             local thisData = actionsData[vim.fn.getcwd()][action]
-            cb = function()
+            callback = function()
                 action.callback(actionsData[action.bind].actions[actionsData[action.bind].current])
             end
         else
-            cb = action.callback
+            callback = action.callback
         end
 
-        table.insert(tasks, {
-            bind = action.bind,
-            desc = action.desc,
-            callback = cb
+        local bindLength = 0
+        if action.bind ~= nil then bindLength = #action.bind end
+
+        local text
+        if action.bind == nil then
+            text = string.rep(" ", maxBindLength) .. hyphen .. action.desc
+        else
+            text = string.rep(" ", maxBindLength - #action.bind) .. action.bind .. hyphen .. action.desc
+
+            table.insert(bindedActions, {
+                bind = action.bind,
+                callback = callback
+            })
+        end
+
+        table.insert(actionOptions, {
+            text = text,
+            callback = callback
         })
     end
 
-    local menu = oneup.new_options_menu(
-        tasks,
+    local menu = OptionsPopup:new(
         {
             title = "Actions",
-            width = 30,
+            min_width = 20,
             border = true,
             closeBinds = config.binds.cancel,
             selectBinds = config.binds.confirm,
+            options = actionOptions
         },
         true
     )
 
-    for _, bind in pairs(config.binds.edit) do
-        menu:set_keymap("n", bind, function()
-            local row = vim.api.nvim_win_get_cursor(0)[1]
-        end)
+    for _, binded in pairs(bindedActions) do
+        menu:set_keymap("n", binded.bind, binded.callback)
     end
 
+    for _, bind in pairs(config.binds.confirm) do
+        menu:set_keymap("n", bind, function()
+            menu:get_option().callback()
+        end)
+    end
 end
 
 function M.actionConfigMenu()
@@ -529,6 +561,7 @@ M.setup({
     }
 })
 
+--[[
 vim.api.nvim_create_user_command(
     "Test",
     function (_)
@@ -567,6 +600,7 @@ vim.api.nvim_create_user_command(
         desc = "sets colors to light theme",
     }
 )
+]]
 
 
 return M
