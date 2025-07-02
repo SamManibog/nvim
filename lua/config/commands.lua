@@ -61,35 +61,6 @@ vim.api.nvim_create_user_command(
 vim.api.nvim_create_user_command(
     "Test",
     function(_)
-        local PreviewPopup = require("oneup.previewed_options_popup")
-        PreviewPopup:new({
-            preview_opts = {
-                title = "preview",
-                width = "40",
-            },
-            options_opts = {
-                title = "options",
-                width = "20",
-            },
-            height = "20",
-            options = {
-                {
-                    text = "Option 1",
-                    preview = { "Table-", "based", "text" }
-                },
-                {
-                    text = "Option 2",
-                    preview = function(self)
-                        return {
-                            self.text .. "'s",
-                            "Function-",
-                            "based",
-                            "text"
-                        }
-                    end
-                }
-            }
-        }, true)
     end,
     {
         nargs = 0,
