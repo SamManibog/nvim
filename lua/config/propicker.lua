@@ -180,7 +180,7 @@ function M.project_menu()
     end
 
     local p
-    p = PromptPopup:new({
+    p = PromptPopup:({
         text = menuText,
         title = "Projects",
         width = "20%",
