@@ -392,7 +392,7 @@ function M.actionsMenu()
         })
     end
 
-    local menu = OptionsPopup(
+    local menu = OptionsPopup:new(
         {
             title = "Actions",
             min_width = 20,
