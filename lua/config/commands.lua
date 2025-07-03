@@ -61,38 +61,39 @@ vim.api.nvim_create_user_command(
 vim.api.nvim_create_user_command(
     "Test",
     function(_)
-        local PreviewPopup = require("oneup.previewed_options_popup")
-        PreviewPopup:new({
-            preview_opts = {
-                title = "preview",
-                width = "40%",
-                min_width = 10,
-            },
-            options_opts = {
-                title = "options",
-                width = "20%",
-                min_width = 5
-            },
-            height = "20%",
-            border = false,
-            options = {
-                {
-                    text = "Option 1",
-                    preview = { "Table-", "based", "text" }
-                },
-                {
-                    text = "Option 2",
-                    preview = function(self)
-                        return {
-                            self.text .. "'s",
-                            "Function-",
-                            "based",
-                            "text"
-                        }
-                    end
+        local popup = require("oneup.options_popup"):new(
+            {
+                title = "test",
+                height = "60%",
+                width = "60%",
+                options = {
+                    {
+                        text = "title 1",
+                        is_title = true
+                    },
+                    {
+                        text = "test 1"
+                    },
+                    {
+                        text = "title 2",
+                        is_title = true
+                    },
+                    {
+                        text = "test 2"
+                    },
+                    {
+                        text = "test 3"
+                    },
                 }
-            }
-        }, true)
+            },
+            true
+        )
+        popup:set_keymap("n", "j", function() popup:next_option() end)
+        popup:set_keymap("n", "k", function() popup:prev_option() end)
+        popup:set_keymap("n", "<CR>", function()
+            print(popup:get_option().text)
+            popup:close()
+        end)
     end,
     {
         nargs = 0,

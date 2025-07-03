@@ -92,10 +92,12 @@ vim.keymap.set(
     end
 )
 
+--[[
 --buildsystem menu
-local bs = require("config.director")
+local bs = require("director")
 vim.keymap.set(
     "n",
     "<leader>b",
     bs.actionsMenu
 )
+]]

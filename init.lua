@@ -4,7 +4,7 @@ require("config.set")
 require("config.commands")
 
 require("config.propicker")
-require("config.director")
+--require("director")
 
 --require("config.buildsystems")
 
