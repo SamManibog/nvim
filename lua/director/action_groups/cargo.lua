@@ -2,7 +2,6 @@ local utils = require("director.utils")
 
 ---@type ActionGroup
 return {
-    name = "Cargo",
     detect = utils.detectCargo,
     actions = {
         {

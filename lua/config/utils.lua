@@ -75,13 +75,6 @@ function M.isExecutable(path)
     return entry ~= nil and vim.fn.executable(path) == 1
 end
 
--- Run a command in the terminal emulator
-function M.runInTerminal(args)
-    vim.cmd("tabnew")
-    pcall(vim.cmd, "terminal " .. args)
-    pcall(vim.cmd, "startinsert")
-end
-
 ---inserts found files into table
 ---@param dir string
 ---@param depth number

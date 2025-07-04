@@ -1,13 +1,16 @@
 ---@type DirectorConfig
 return {
     preserve = true,
-    config_types = {},
     binds = {
         confirm =   { "<CR>", "<Space>" },
         edit =      { "i", "I", "a", "A" },
         new =       { "o", "O" },
         cancel =    { "<C-c>", "<Esc>" },
+        up =        { "k", "<Up>" },
+        down =      { "j", "<Down>" },
     },
-    cwd_actions = {},
-    file_actions = {},
+    actions = {
+        cargo = require("director.action_groups.cargo"),
+        cmake = require("director.action_groups.cmake"),
+    },
 }
