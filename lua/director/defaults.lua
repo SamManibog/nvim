@@ -1,4 +1,5 @@
 ---@type DirectorConfig
+---@diagnostic disable-next-line:missing-fields
 return {
     preserve = true,
     binds = {

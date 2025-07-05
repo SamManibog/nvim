@@ -88,9 +88,9 @@ vim.api.nvim_create_user_command(
             },
             true
         )
-        popup:set_keymap("n", "j", function() popup:next_option() end)
-        popup:set_keymap("n", "k", function() popup:prev_option() end)
-        popup:set_keymap("n", "<CR>", function()
+        popup:setKeymap("n", "j", function() popup:next_option() end)
+        popup:setKeymap("n", "k", function() popup:prev_option() end)
+        popup:setKeymap("n", "<CR>", function()
             print(popup:get_option().text)
             popup:close()
         end)

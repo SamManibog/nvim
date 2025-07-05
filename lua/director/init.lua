@@ -584,8 +584,7 @@ function openActionsMenu(title, actions, file_path)
     local p = OptionsPopup:new({
         title = title,
         border = true,
-        width = "40%",
-        min_width = 25,
+        width = { min = 25, value = "40%"},
         height = "80%",
         separator_align = longest_bind + #hyphen,
 
@@ -594,22 +593,22 @@ function openActionsMenu(title, actions, file_path)
 
     --set keybinds
     for _, up_bind in pairs(main_config.binds.up) do
-        p:set_keymap("n", up_bind, function() p:prev_option() end)
+        p:setKeymap("n", up_bind, function() p:prev_option() end)
     end
     for _, down_bind in pairs(main_config.binds.down) do
-        p:set_keymap("n", down_bind, function() p:next_option() end)
+        p:setKeymap("n", down_bind, function() p:next_option() end)
     end
     for _, cancel_bind in pairs(main_config.binds.cancel) do
-        p:set_keymap("n", cancel_bind, function() p:close() end)
+        p:setKeymap("n", cancel_bind, function() p:close() end)
     end
     for _, confirm_bind in pairs(main_config.binds.confirm) do
-        p:set_keymap("n", confirm_bind, function()
+        p:setKeymap("n", confirm_bind, function()
             p:get_option().callback()
             p:close()
         end)
     end
     for bind, callback in pairs(bind_map) do
-        p:set_keymap("n", bind, function()
+        p:setKeymap("n", bind, function()
             callback()
             p:close()
         end)

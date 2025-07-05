@@ -183,8 +183,7 @@ function M.project_menu()
     p = PromptPopup:new({
         text = menuText,
         title = "Projects",
-        width = "20%",
-        min_width = 20,
+        width = { value = "20%", min = 20 },
         border = true,
         prompt = "> ",
         verify_input = function (text)
