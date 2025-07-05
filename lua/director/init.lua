@@ -587,6 +587,7 @@ function openActionsMenu(title, actions, file_path)
         width = "40%",
         min_width = 25,
         height = "80%",
+        separator_align = longest_bind + #hyphen,
 
         options = options
     }, true)
