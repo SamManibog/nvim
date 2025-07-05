@@ -50,6 +50,8 @@ local utils = require("director.utils")
 ---@field preserve boolean                      whether or not to save in-editor configuration to disk
 ---@field binds DirectorBindsConfig             binds for menus
 ---@field actions table<groupName, ActionGroup> a list of action groups that may be used
+---@field cwd_actions table<groupName, ActionGroup> a list of action groups that may be used in the cwd
+---@field file_actions table<groupName, ActionGroup> a list of action groups that may be used in the file
 
 ---@alias bind string
 ---@alias path string
@@ -97,6 +99,16 @@ function M.setup(opts)
     if main_config.binds == nil then main_config.binds = {} end ---@diagnostic disable-line:missing-fields
     main_config.binds = vim.tbl_extend("force", main_config.binds, default.binds)
 
+    main_config.file_actions = {}
+    main_config.cwd_actions = {}
+    for group_name, group in pairs(main_config.actions) do
+        if group.file_local then
+            main_config.file_actions[group_name] = group
+        else
+            main_config.cwd_actions[group_name] = group
+        end
+    end
+
     vim.api.nvim_create_autocmd(
         'DirChanged',
         {
@@ -104,6 +116,7 @@ function M.setup(opts)
             callback = function()
                 M.refreshCwdActions()
                 file_actions = {}
+                file_bind_info = {}
             end
         }
     )
@@ -114,14 +127,53 @@ function M.setup(opts)
             callback = function()
                 M.refreshCwdActions()
                 file_actions = {}
+                file_bind_info = {}
             end
         }
     )
 
     vim.api.nvim_create_autocmd(
-        'BufNew',
+        'BufEnter',
         {
-            callback = M.refreshFileActions
+            callback = M.loadFileActions
+        }
+    )
+
+    vim.api.nvim_create_user_command(
+        "Director",
+        function (cmd)
+            local help = function()
+                print("Director command can be run with the following arguments:")
+                print("\t     (m)ain - to list all loaded commands")
+                print("\t(d)irectory - to list all working directory commands")
+                print("\t     (f)ile - to list all file commands")
+                print("\t    (q)uick - to list all commands with keybinds")
+                print("\t   (c)onfig - to open the configuration menu")
+            end
+
+            if cmd.fargs[1] == nil then
+                help()
+                return
+            end
+
+            local arg = string.lower(string.sub(cmd.fargs[1], 1, 1))
+            if arg == "m" then
+                M.mainMenu()
+            elseif arg == "d" then
+                M.directoryMenu()
+            elseif arg == "f" then
+                M.fileMenu()
+            elseif arg == "q" then
+                M.quickMenu()
+            elseif arg == "c" then
+                M.configMenu()
+            else
+                help()
+            end
+        end,
+        {
+            nargs = "?",
+            desc = "Opens the specified Director popup menu",
         }
     )
 end
@@ -212,7 +264,7 @@ local function isPresetValid(preset, config_desciptor)
                 if type(item) ~= main_type then return nil end
             end
         else
-            error("Invalid field type '" .. field.type .. "' in ConfigDescriptor.")
+            print("Invalid field type '" .. field.type .. "' in ConfigDescriptor.")
             return
         end
 
@@ -364,15 +416,18 @@ end
 
 ---refreshes actions belonging to the current working directory
 function M.refreshCwdActions()
-    local cwd = vim.fn.getcwd()
+    local cwd = vim.fn.getcwd() .. "/"
+
+    cwd_actions = {}
+    cwd_bind_info = {}
 
     --load groups
-    for name, group in pairs(main_config.actions) do
+    for name, group in pairs(main_config.cwd_actions) do
         local no_skip = true
         if group.file_local or not group.detect() then no_skip = false end
 
         if not utils.isValidName(name) then
-            error(
+            print(
                 "Attempted to load group with invalid name '" .. name .. "'."
                 .. "Names may only contain alphanumeric characters, underscores, and spaces."
             )
@@ -389,21 +444,22 @@ function M.refreshCwdActions()
 end
 
 ---refreshes actions belonging to the current working directory
-function M.refreshFileActions()
+function M.loadFileActions()
     local path = vim.fn.expand("%:p")
 
-    if not vim.fn.filereadable(vim.fn.expand(path)) == 1 then return end
+    if vim.fn.filereadable(path) ~= 1 then return end
+    if file_actions[path] ~= nil then return end
 
     file_actions[path] = {}
     file_bind_info[path] = {}
 
     --load groups
-    for name, group in pairs(main_config.actions) do
+    for name, group in pairs(main_config.file_actions) do
         local no_skip = true
-        if not group.file_local or not group.detect() then no_skip = false end
+        if (not group.file_local) or (not group.detect()) then no_skip = false end
 
         if not utils.isValidName(name) then
-            error(
+            print(
                 "Attempted to load group with invalid name '" .. name .. "'."
                 .. "Names may only contain alphanumeric characters, underscores, and spaces."
             )
@@ -476,7 +532,7 @@ function openActionsMenu(title, actions, file_path)
         if main_config.actions[group_name].file_local then
             path = file_path
         else
-            path = vim.fn.getcwd()
+            path = vim.fn.getcwd().."/"
         end
 
         --generate bound options
@@ -542,6 +598,9 @@ function openActionsMenu(title, actions, file_path)
     for _, down_bind in pairs(main_config.binds.down) do
         p:set_keymap("n", down_bind, function() p:next_option() end)
     end
+    for _, cancel_bind in pairs(main_config.binds.cancel) do
+        p:set_keymap("n", cancel_bind, function() p:close() end)
+    end
     for _, confirm_bind in pairs(main_config.binds.confirm) do
         p:set_keymap("n", confirm_bind, function()
             p:get_option().callback()
@@ -571,7 +630,7 @@ function M.quickMenu()
 
     local file_path = vim.fn.expand("%:p")
     if vim.fn.filereadable(file_path) == 1 then
-        for bind, bind_info in pairs(file_bind_info) do
+        for bind, bind_info in pairs(file_bind_info[file_path]) do
             if actions[bind_info.group_name] == nil then
                 actions[bind_info.group_name] = { bound = {}, unbound = {} }
             end
@@ -579,19 +638,23 @@ function M.quickMenu()
             local file_action = file_actions[file_path][bind_info.group_name].bound[bind]
 
             --handle priority
-            local priority = 100
-            if file_action.priority ~= nil then
-                priority = file_action.priority
-            end
-
-            local cwd_priority = 0
-            if cwd_bind_info[bind].priority ~= nil then
-                cwd_priority = cwd_bind_info[bind].priority
-            end
-
-            if priority >= cwd_priority then
+            if cwd_bind_info[bind] == nil then
                 actions[bind_info.group_name].bound[bind] = file_action
-                actions[cwd_bind_info[bind].group_name].bound[bind] = nil
+            else
+                local priority = 100
+                if file_action.priority ~= nil then
+                    priority = file_action.priority
+                end
+
+                local cwd_priority = 0
+                if cwd_bind_info[bind].priority ~= nil then
+                    cwd_priority = cwd_bind_info[bind].priority
+                end
+
+                if priority >= cwd_priority then
+                    actions[bind_info.group_name].bound[bind] = file_action
+                    actions[cwd_bind_info[bind].group_name].bound[bind] = nil
+                end
             end
         end
     end
@@ -600,37 +663,78 @@ function M.quickMenu()
 end
 
 ---accesses all detected actions for the cwd
-function M.cwdMenu()
-    error("todo")
+function M.directoryMenu()
+    local file_path = vim.fn.expand("%:p")
+
+    openActionsMenu(" Directory Actions ", cwd_actions, file_path)
 end
 
 ---accesses all detected active file-specific actions
 function M.fileMenu()
-    error("todo")
+    local file_path = vim.fn.expand("%:p")
+
+    if vim.fn.filereadable(file_path) == 1 then
+        openActionsMenu(" File Actions ", file_actions[file_path], file_path)
+    else
+        print("Director File Menu could not be opened for the current buffer as it is not associated to a file.")
+    end
 end
 
 ---accesses all detected actions
 function M.mainMenu()
-    error("todo")
-end
+    ---@type { [groupName]: ActionDataContainer }
+    local actions = {}
 
----accesses quickMenu action configurations
-function M.quickConfigMenu()
-    error("todo")
-end
+    for name, group in pairs(cwd_actions) do
+        actions[name] = { bound = {}, unbound = {} }
 
----accesses cwdMenu action configurations
-function M.cwdConfigMenu()
-    error("todo")
-end
+        for bind, action in pairs(group.bound) do
+            actions[name].bound[bind] = action
+        end
 
----accesses fileMenu action configurations
-function M.fileConfigMenu()
-    error("todo")
+        for idx, action in pairs(group.unbound) do
+            actions[name].unbound[idx] = action
+        end
+    end
+
+    local file_path = vim.fn.expand("%:p")
+    if vim.fn.filereadable(file_path) == 1 then
+        for name, group in pairs(file_actions[file_path]) do
+            actions[name] = { bound = {}, unbound = {} }
+
+            for bind, action in pairs(group.bound) do
+
+                local priority = 100
+                if action.priority ~= nil then
+                    priority = action.priority
+                end
+
+                local cwd_priority = 0
+                local cwd_group = cwd_bind_info[bind].group_name
+                if cwd_bind_info[bind].priority ~= nil then
+                    cwd_priority = cwd_bind_info[bind].priority
+                end
+
+                if priority >= cwd_priority then
+                    actions[name].bound[bind] = action
+                    table.insert(actions[cwd_group].unbound, actions[cwd_group].bound[bind])
+                    actions[cwd_group].bound[bind] = nil
+                else
+                    table.insert(actions[name].unbound, action)
+                end
+            end
+
+            for idx, action in pairs(group.unbound) do
+                actions[name].unbound[idx] = action
+            end
+        end
+    end
+
+    openActionsMenu(" All Actions ", actions, file_path)
 end
 
 ---accesses mainMenu action configurations
-function M.mainConfigMenu()
+function M.configMenu()
     error("todo")
 end
 
