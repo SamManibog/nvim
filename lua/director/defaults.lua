@@ -3,12 +3,17 @@
 return {
     preserve = true,
     binds = {
-        confirm =   { "<CR>", "<Space>" },
-        edit =      { "i", "I", "a", "A" },
-        new =       { "o", "O" },
-        cancel =    { "<C-c>", "<Esc>" },
-        up =        { "k", "<Up>" },
-        down =      { "j", "<Down>" },
+        confirm =           { "<CR>", "<Space>" },
+        edit =              { "i", "I", "a", "A" },
+        new =               { "o", "O" },
+        cancel =            { "<C-c>", "<Esc>" },
+        up =                { "k", "<Up>" },
+        down =              { "j", "<Down>" },
+        quick_menu =        {},
+        directory_menu =    {},
+        file_menu =         {},
+        main_menu =         {},
+        config_menu =       {},
     },
     actions = {
         cargo = require("director.action_groups.cargo"),

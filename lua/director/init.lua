@@ -3,14 +3,6 @@ local M = {}
 local OptionsPopup = require("oneup.options_popup")
 local utils = require("director.utils")
 
----@alias ConfigFieldType
----| '"boolean"'
----| '"number"'
----| '"string"'
----| '"boolean list"'
----| '"number list"'
----| '"string list"'
-
 ---@class ConfigField
 ---@field name string           the name/key for the field
 ---@field type ConfigFieldType  the datatype of the configuration fieldd
@@ -21,12 +13,17 @@ local utils = require("director.utils")
 ---@field validate (fun(table): boolean)?   a function used to validate a configuration
 
 ---@class DirectorBindsConfig
----@field up string[]       a list of binds used to move cursor upwards in the menus
----@field down string[]     a list of binds used to move cursor downwards in the menus
----@field confirm string[]  a list of binds used to confirm a selection
----@field edit string[]     a list of binds used to begin editing a config or field
----@field new string[]      a list of binds used to create a new config preset
----@field cancel string[]   a list of binds used to return to the previous menu (or close the menu)
+---@field up string[]           a list of binds used to move cursor upwards in the menus
+---@field down string[]         a list of binds used to move cursor downwards in the menus
+---@field confirm string[]      a list of binds used to confirm a selection
+---@field edit string[]         a list of binds used to begin editing a config or field
+---@field new string[]          a list of binds used to create a new config preset
+---@field cancel string[]       a list of binds used to return to the previous menu (or close the menu)
+---@field quick_menu string[]   a list of binds used to list all actions with keybinds
+---@field file_menu string[]    a list of binds used to list all actions pertaining to the current file buffer
+---@field directory_menu string[]   a list of binds used to list all actions pertaining to the current working directory
+---@field main_menu string[]    a list of binds used to list all loaded actions
+---@field config_menu string[]  a list of binds used to list all loaded configs
 
 ---@alias ConfigName string the name of a configuration defined by keys in main_config.config_types
 ---@alias ConfigKey string  a key corresponding to a given ConfigField defined in main_config.config_types[i]
@@ -97,7 +94,7 @@ function M.setup(opts)
     if main_config.actions == nil then main_config.actions = default.actions end
     if main_config.preserve == nil then main_config.preserve = default.preserve end
     if main_config.binds == nil then main_config.binds = {} end ---@diagnostic disable-line:missing-fields
-    main_config.binds = vim.tbl_extend("force", main_config.binds, default.binds)
+    main_config.binds = vim.tbl_extend("keep", main_config.binds, default.binds)
 
     main_config.file_actions = {}
     main_config.cwd_actions = {}
@@ -109,6 +106,29 @@ function M.setup(opts)
         end
     end
 
+    --setup binds
+    for key, value in pairs(main_config.binds) do
+        if type(value) == "string" then
+            main_config.binds[key] = { value }
+        end
+    end
+    for _, bind in pairs(main_config.binds.main_menu) do
+        vim.keymap.set("n", bind, M.mainMenu)
+    end
+    for _, bind in pairs(main_config.binds.quick_menu) do
+        vim.keymap.set("n", bind, M.quickMenu)
+    end
+    for _, bind in pairs(main_config.binds.directory_menu) do
+        vim.keymap.set("n", bind, M.directoryMenu)
+    end
+    for _, bind in pairs(main_config.binds.file_menu) do
+        vim.keymap.set("n", bind, M.fileMenu)
+    end
+    for _, bind in pairs(main_config.binds.config_menu) do
+        vim.keymap.set("n", bind, M.configMenu)
+    end
+
+    --setup autocommands
     vim.api.nvim_create_autocmd(
         'DirChanged',
         {
@@ -584,23 +604,17 @@ function openActionsMenu(title, actions, file_path)
     local p = OptionsPopup:new({
         title = title,
         border = true,
-        width = { min = 25, value = "40%"},
-        height = "80%",
+        width = { min = "30%" },
+        height = { min = 5, max = "75%" },
         separator_align = longest_bind + #hyphen,
+        next_bind = main_config.binds.down,
+        previous_bind = main_config.binds.up,
+        close_bind = main_config.binds.cancel,
 
         options = options
     }, true)
 
     --set keybinds
-    for _, up_bind in pairs(main_config.binds.up) do
-        p:setKeymap("n", up_bind, function() p:prev_option() end)
-    end
-    for _, down_bind in pairs(main_config.binds.down) do
-        p:setKeymap("n", down_bind, function() p:next_option() end)
-    end
-    for _, cancel_bind in pairs(main_config.binds.cancel) do
-        p:setKeymap("n", cancel_bind, function() p:close() end)
-    end
     for _, confirm_bind in pairs(main_config.binds.confirm) do
         p:setKeymap("n", confirm_bind, function()
             p:get_option().callback()
@@ -676,7 +690,7 @@ function M.fileMenu()
     if vim.fn.filereadable(file_path) == 1 then
         openActionsMenu(" File Actions ", file_actions[file_path], file_path)
     else
-        print("Director File Menu could not be opened for the current buffer as it is not associated to a file.")
+        print("Director File Menu could not be opened for the current buffer as it is not associated with a file.")
     end
 end
 
@@ -730,20 +744,14 @@ function M.mainMenu()
         end
     end
 
-    openActionsMenu(" All Actions ", actions, file_path)
+    openActionsMenu(" Actions ", actions, file_path)
 end
 
 ---accesses mainMenu action configurations
 function M.configMenu()
+    local fields = {}
+
     error("todo")
 end
-
-M.setup()
-
-vim.keymap.set(
-    "n",
-    "<leader>b",
-    M.quickMenu
-)
 
 return M
