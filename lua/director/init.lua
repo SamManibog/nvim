@@ -617,7 +617,7 @@ function openActionsMenu(title, actions, file_path)
     --set keybinds
     for _, confirm_bind in pairs(main_config.binds.confirm) do
         p:setKeymap("n", confirm_bind, function()
-            p:get_option().callback()
+            p:getOption().callback()
             p:close()
         end)
     end

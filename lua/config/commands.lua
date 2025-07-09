@@ -61,39 +61,57 @@ vim.api.nvim_create_user_command(
 vim.api.nvim_create_user_command(
     "Test",
     function(_)
-        local popup = require("oneup.options_popup"):new(
-            {
-                title = "test",
-                height = "60%",
-                width = "60%",
-                options = {
-                    {
-                        text = "title 1",
-                        is_title = true
-                    },
-                    {
-                        text = "test 1"
-                    },
-                    {
-                        text = "title 2",
-                        is_title = true
-                    },
-                    {
-                        text = "test 2"
-                    },
-                    {
-                        text = "test 3"
-                    },
+        require("oneup.config_popup"):new({
+            fields = {
+                string = {
+                    type = "string"
+                },
+                number = {
+                    type = "number"
+                },
+                boolean = {
+                    type = "boolean"
+                },
+                option = {
+                    type = "option"
+                },
+                string_list = {
+                    type = "string list"
+                },
+                number_list = {
+                    type = "number list"
+                },
+                boolean_list = {
+                    type = "boolean list"
                 }
             },
-            true
-        )
-        popup:setKeymap("n", "j", function() popup:next_option() end)
-        popup:setKeymap("n", "k", function() popup:prev_option() end)
-        popup:setKeymap("n", "<CR>", function()
-            print(popup:get_option().text)
-            popup:close()
-        end)
+            big_input_opts = {
+                width = "40%",
+                height = "40%"
+            },
+            small_input_width = "20%",
+            preview_opts = {
+                width = "40%",
+                height = "40%"
+            },
+            options_opts = {
+                width = "40%",
+                height = "40%"
+            },
+            height = "40%",
+            config = {
+                string = "default str",
+                number = 7,
+                boolean = true,
+                option = "first option",
+                string_list = { "hi1", "hi2", "hi3" },
+                number_list = { 1, 2, 3, 4, 5 },
+                boolean_list = { true, false, true, false }
+            },
+            next_bind = { "j", "<Down>" },
+            previous_bind = { "k", "<Up>" },
+            close_bind = { "<Esc>", "<C-c>" },
+        }, true)
     end,
     {
         nargs = 0,
