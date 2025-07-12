@@ -12,7 +12,7 @@ end
 ---@param path string the path of the json file
 ---@return any
 function M.safeJsonDecode(path)
-    if vim.fn.filereadable(path) == true then
+    if vim.fn.filereadable(path) == 1 then
         local output
         local decode = function()
             output = vim.fn.json_decode(vim.fn.readfile(path))
@@ -108,6 +108,14 @@ function M.getPathHash(path)
     end
 
     return hash
+end
+
+---removes a directory at a given path recursively
+---@param path string the path at which to make the directory (no parents created)
+function M.rm(path)
+    if vim.uv.fs_stat(path) ~= nil then
+        vim.fn.delete(path, "rf")
+    end
 end
 
 ---creates a directory at the given path if it doesn't already exist

@@ -62,6 +62,7 @@ local utils = require("director.utils")
 ---@alias bind string
 ---@alias path string
 ---@alias groupName string
+---@alias configName string
 
 ---@alias ActionDataContainer { bound: table<bind, ActionDescriptor>, unbound: ActionDescriptor[] }
 
@@ -93,8 +94,17 @@ local file_actions = {}
 ---@type { [path]: table<bind, FileBindInfo> }
 local file_bind_info = {}
 
----@type { file: string? }
-local file_path_tbl = {}
+---@type { file: string?, modified: { path: path, group: groupName, config: configName }[] }
+local director_state = { modified = {} }
+
+local function flagModified(path, group, config)
+    for _, mod in ipairs(director_state.modified) do
+        if path == mod.path and group == mod.group and config == mod.config then
+            return
+        end
+    end
+    table.insert(director_state.modified, { path = path, group = group, config = config })
+end
 
 ---@return string
 local function getcwd()
@@ -180,7 +190,7 @@ function M.setup(opts)
                 path = string.gsub(path, "\\", "/")
 
                 if vim.fn.filereadable(path) == 1 then
-                    file_path_tbl.file = path
+                    director_state.file = path
                 end
 
                 M.loadFileActions()
@@ -188,21 +198,41 @@ function M.setup(opts)
         }
     )
 
-    --Director command (to open menus)
+    --save data to disk before closing
+    vim.api.nvim_create_autocmd(
+        'ExitPre',
+        {
+            callback = function()
+                M.saveConfigs()
+            end
+        }
+    )
+
+    vim.api.nvim_create_user_command(
+        "DirectorSave",
+        function (_)
+            M.saveConfigs()
+        end,
+        {
+            nargs = 0,
+            desc = "Saves all changes made on director configurations",
+        }
+    )
+
+    --Director command (to open menus) or save configs
     vim.api.nvim_create_user_command(
         "Director",
         function (cmd)
-            local help = function()
-                print("Director command can be run with the following arguments:")
-                print("\t     (m)ain - to list all loaded commands")
-                print("\t(d)irectory - to list all working directory commands")
-                print("\t     (f)ile - to list all file commands")
-                print("\t    (q)uick - to list all commands with keybinds")
-                print("\t   (c)onfig - to open the configuration menu")
-            end
+            local help ="Director command can be run with the following arguments:"
+            .."\t    (q)uick - to list all commands with keybinds"
+            .."\t     (m)ain - to list all loaded commands"
+            .."\t(d)irectory - to list all working directory commands"
+            .."\t     (f)ile - to list all file commands"
+            .."\t   (c)onfig - to open the configuration menu"
+            .."\t     (s)ave - to force save all configuration changes"
 
             if cmd.fargs[1] == nil then
-                help()
+                print(help)
                 return
             end
 
@@ -217,21 +247,24 @@ function M.setup(opts)
                 M.quickMenu()
             elseif arg == "c" then
                 M.configMenu()
+            elseif arg == "s" then
+                M.saveConfigs()
             else
-                help()
+                print(help)
             end
         end,
         {
             nargs = "?",
-            desc = "Opens the specified Director popup menu",
+            desc = "Director command center"
         }
     )
 end
 
 ---reads the manifest file, returning the data folder corresponding to the given path
 ---@param path string the path to be searched for
----@return string configPath the path at which to find data for the given path
-local function queryManifest(path)
+---@param create boolean whether to add to the existing file structure if relevant data is not found. if false, function may return nil indicating the lack of said data
+---@return string? configPath the path at which to find data for the given path, if nil the manifest file has not yet been created
+local function queryManifest(path, create)
     --read/write to manifest file
     ---@type string
     local director_path = vim.fn.stdpath("data") .. "/director"
@@ -239,6 +272,9 @@ local function queryManifest(path)
 
     ---@type string
     local data_path = director_path .. "/" .. utils.getPathHash(path)
+    if (not create) and vim.fn.isdirectory(data_path) ~= 1 then
+        return nil
+    end
     utils.mkdir(data_path)
 
     ---@type string
@@ -333,19 +369,72 @@ local function isProfileValid(profile, profile_fields)
             end
         end
 
-        out[field] = field_value
+        out[field.name] = field_value
     end
 
     return out
+end
+
+---tries to clean up unececessary file structures
+---@param path path the path of the scope for the config
+---@param group groupName the name of the group
+---@param config configName the name of the group configuration to save
+local function attemptClean(path, group, config)
+    local data_path = vim.fn.stdpath("data") .. "/director/" .. utils.getPathHash(path)
+    local manifest_path = data_path .. "/manifest.json"
+
+    --check if manifest file exists or is empty
+    local manifest = utils.safeJsonDecode(manifest_path)
+    if manifest == nil or next(manifest) == nil then
+        utils.rmdir(data_path)
+    else
+        local path_folder_name = manifest[path]
+        if path_folder_name == nil then return end
+
+        local path_folder =  data_path .. "/" .. path_folder_name
+        local group_path =  path_folder .. "/" .. group
+        local config_path = group_path .. "/" .. config .. ".json"
+
+        --check if config file exists or is empty (contains profile: [], active: nil)
+        local config_json = utils.safeJsonDecode(config_path)
+        if
+            config_json == nil
+            or config_json.profiles == nil
+            or next(config_json.profiles) == nil
+        then
+            utils.rm(config_path)
+        end
+
+        --delete group,path folder if it is empty
+        pcall(vim.fn.delete, group_path, "d")
+        pcall(vim.fn.delete, path_folder, "d")
+
+        --if path folder is deleted, delete the manifest entry
+        if vim.fn.isdirectory(path_folder) ~= 1 then
+            manifest[path] = nil
+
+            if next(manifest) == nil then
+                utils.rm(data_path)
+            else
+                local manifest_file = io.open(manifest_path, "w")
+                if manifest_file ~= nil then
+                    manifest_file:write(vim.fn.json_encode(manifest))
+                    manifest_file:close()
+                else
+                    error("unable to write to file: " .. manifest_path)
+                end
+            end
+        end
+    end
 end
 
 ---saves to disk the data for the given group configuration
 ---must ensure that all parameters are correct before calling the function
 ---@param path path the path of the scope for the config
 ---@param group_name groupName the name of the group
----@param config_name string the name of the group configuration to save
+---@param config_name configName the name of the group configuration to save
 local function saveGroupConfig(path, group_name, config_name)
-    local group_data_folder = queryManifest(path) .. "/" .. group_name
+    local group_data_folder = queryManifest(path, true) .. "/" .. group_name
     utils.mkdir(group_data_folder)
 
     local config_path = group_data_folder .. "/" .. config_name .. ".json"
@@ -360,19 +449,42 @@ local function saveGroupConfig(path, group_name, config_name)
     end
 end
 
+function M.saveConfigs()
+    if main_config.preserve == false then return end
+
+    for _, mod in ipairs(director_state.modified) do
+        saveGroupConfig(mod.path, mod.group, mod.config)
+    end
+    for _, mod in ipairs(director_state.modified) do
+        attemptClean(mod.path, mod.group, mod.config)
+    end
+    director_state.modified = {}
+end
+
 ---loads from disk the config data for the given group
 ---@param path path the name of the scope for the config
 ---@param group_name groupName the group for which to load configs
 local function loadGroupConfigs(path, group_name)
     local group = main_config.actions[group_name]
+
     --skip the stress if theres nothing to load
     if group.config_types == nil or next(group.config_types) == nil then
         return
     end
 
     --find and ensure existence of data folder for group
-    ---@type string
-    local data_folder = queryManifest(path)
+    ---@type string?
+    local data_folder = queryManifest(path, false)
+
+    --if manifest file does not exist, at least initialize empty config in memory
+    if data_folder == nil then
+        for name, _ in pairs(group.config_types) do
+            if config_data[path] == nil then config_data[path] = {} end
+            if config_data[path][group_name] == nil then config_data[path][group_name] = {} end
+            config_data[path][group_name][name] = { active = nil, profiles = {} }
+        end
+        return
+    end
 
     ---@type string
     local group_data_folder = data_folder .. "/" .. group_name
@@ -410,6 +522,8 @@ local function loadGroupConfigs(path, group_name)
                         local updated_profile = isProfileValid(profile, group.config_types[name])
                         if updated_profile ~= nil then
                             config_data[path][group_name][name].profiles[profile_name] = updated_profile
+                        else
+                            print("Attempted to load invalid profile '"..profile_name.."'. Skipped.")
                         end
                     end
                 end
@@ -480,7 +594,9 @@ end
 
 ---refreshes actions belonging to the current working directory
 function M.refreshCwdActions()
-    local cwd = string.gsub(vim.fn.getcwd().."/", "\\", "/")
+    M.saveConfigs()
+
+    local cwd = getcwd()
 
     cwd_actions = {}
     cwd_bind_info = {}
@@ -509,8 +625,8 @@ end
 
 ---refreshes actions belonging to the current working directory
 function M.loadFileActions()
-    local path = file_path_tbl.file
-    if path == nil or file_actions[file_path_tbl.file] ~= nil then return end
+    local path = director_state.file
+    if path == nil or file_actions[director_state.file] ~= nil then return end
 
     file_actions[path] = {}
     file_bind_info[path] = {}
@@ -595,7 +711,7 @@ function openActionsMenu(title, actions, file_path)
         if main_config.actions[group_name].file_local then
             path = file_path
         else
-            path = string.gsub(vim.fn.getcwd().."/", "\\", "/")
+            path = getcwd()
         end
 
         --generate bound options
@@ -685,7 +801,7 @@ function M.quickMenu()
         actions[bind_info.group_name].bound[bind] = cwd_actions[bind_info.group_name].bound[bind]
     end
 
-    local file_path = file_path_tbl.file or ""
+    local file_path = director_state.file or ""
     if vim.fn.filereadable(file_path) == 1 then
         for bind, bind_info in pairs(file_bind_info[file_path]) do
             if actions[bind_info.group_name] == nil then
@@ -721,14 +837,14 @@ end
 
 ---accesses all detected actions for the cwd
 function M.directoryMenu()
-    local file_path = file_path_tbl.file or ""
+    local file_path = director_state.file or ""
 
     openActionsMenu(" Directory Actions ", cwd_actions, file_path)
 end
 
 ---accesses all detected active file-specific actions
 function M.fileMenu()
-    local file_path = file_path_tbl.file or ""
+    local file_path = director_state.file or ""
 
     if vim.fn.filereadable(file_path) == 1 then
         openActionsMenu(" File Actions ", file_actions[file_path], file_path)
@@ -754,7 +870,7 @@ function M.mainMenu()
         end
     end
 
-    local file_path = file_path_tbl.file or ""
+    local file_path = director_state.file or ""
     if vim.fn.filereadable(file_path) == 1 then
         for name, group in pairs(file_actions[file_path]) do
             actions[name] = { bound = {}, unbound = {} }
@@ -790,8 +906,11 @@ function M.mainMenu()
     openActionsMenu(" Actions ", actions, file_path)
 end
 
+---@type function, function, function, function
+local configFieldMenu, configProfilesMenu, configProfileEditor
+
 ---opens the config menu for a specific field in a configuration
-function M.configFieldMenu(path, group, config, profile, field)
+configFieldMenu = function(path, group, config, profile, field)
     ---@type ConfigField
     local desc
     do
@@ -815,10 +934,11 @@ function M.configFieldMenu(path, group, config, profile, field)
             close_bind = main_config.binds.cancel,
             on_confirm = function (text)
                 config_data[path][group][config].profiles[profile][field] = text
+                flagModified(path, group, config)
                 p:close()
             end,
             on_close = function()
-                M.configProfileEditor(path, group, config, profile)
+                configProfileEditor(path, group, config, profile)
             end
         }, true)
 
@@ -859,10 +979,11 @@ function M.configFieldMenu(path, group, config, profile, field)
             close_bind = main_config.binds.cancel,
             on_confirm = function (text)
                 config_data[path][group][config].profiles[profile][field] = text
+                flagModified(path, group, config)
                 p:close()
             end,
             on_close = function()
-                M.configProfileEditor(path, group, config, profile)
+                configProfileEditor(path, group, config, profile)
             end
         }, true)
 
@@ -890,12 +1011,13 @@ function M.configFieldMenu(path, group, config, profile, field)
             previous_bind = main_config.binds.up,
             height = { min = 5, max = "70%" },
             on_close = function()
-                M.configProfileEditor(path, group, config, profile)
+                configProfileEditor(path, group, config, profile)
             end
         }, true)
         for _, bind in pairs(main_config.binds.select) do
             p:setKeymap("n", bind, function()
                 config_data[path][group][config].profiles[profile][field] = p:getOption().text
+                flagModified(path, group, config)
                 p:close()
             end)
         end
@@ -914,7 +1036,7 @@ function M.configFieldMenu(path, group, config, profile, field)
                     vim.api.nvim_del_autocmd(p.write_autocmd)
                     p.write_autocmd = nil ---@diagnostic disable-line:inject-field
                 end
-                M.configProfileEditor(path, group, config, profile)
+                configProfileEditor(path, group, config, profile)
             end
         }, true)
         vim.api.nvim_set_option_value("buftype", "acwrite", { buf = p:bufId() })
@@ -929,8 +1051,9 @@ function M.configFieldMenu(path, group, config, profile, field)
                         return
                     end
                     vim.api.nvim_set_option_value("modified", false, { buf = p:bufId() })
-                    print("Saved.")
                     config_data[path][group][config].profiles[profile][field] = value
+                    print("Saved.")
+                    flagModified(path, group, config)
                 end
             }
         )
@@ -947,13 +1070,14 @@ function M.configFieldMenu(path, group, config, profile, field)
             previous_bind = main_config.binds.up,
             height = { min = 5, max = "70%" },
             on_close = function()
-                M.configProfileEditor(path, group, config, profile)
+                configProfileEditor(path, group, config, profile)
             end
         }, true)
 
         for _, bind in pairs(main_config.binds.select) do
             p:setKeymap("n", bind, function()
                 config_data[path][group][config].profiles[profile][field] = p:getOption().value
+                flagModified(path, group, config)
                 p:close()
             end)
         end
@@ -963,7 +1087,7 @@ function M.configFieldMenu(path, group, config, profile, field)
 end
 
 ---opens the config menu for a specific profile
-function M.configProfileEditor (path, group, config, profile)
+configProfileEditor = function(path, group, config, profile)
     local cfg = config_data[path][group][config].profiles[profile]
     local fields = main_config.actions[group].config_types[config]
 
@@ -1013,8 +1137,9 @@ function M.configProfileEditor (path, group, config, profile)
                 if opt.boolean then
                     cfg[opt.text] = not cfg[opt.text]
                     p:reloadPreview()
+                    flagModified(path, group, config)
                 else
-                    M.configFieldMenu(path, group, config, profile, opt.text)
+                    configFieldMenu(path, group, config, profile, opt.text)
                     p:close()
                 end
             end)
@@ -1022,7 +1147,7 @@ function M.configProfileEditor (path, group, config, profile)
     end
     for _, bind in pairs(main_config.binds.cancel) do
         p:setKeymap("n", bind, function()
-            M.configProfilesMenu(path, group, config)
+            configProfilesMenu(path, group, config)
         end)
     end
 end
@@ -1099,7 +1224,7 @@ local function configPreview(path, group, config, profile, show_profile)
     return out
 end
 
-function M.newProfileMenu(path, group, config)
+local function newProfileMenu(path, group, config)
     local p
     p = PromptPopup:new({
         text = {
@@ -1128,15 +1253,16 @@ function M.newProfileMenu(path, group, config)
             config_data[path][group][config].profiles[name] = utils.getDefaultProfile(
                 main_config.actions[group].config_types[config]
             )
+            flagModified(path, group, config)
             p:close()
         end,
         on_close = function()
-            M.configProfilesMenu(path, group, config)
+            configProfilesMenu(path, group, config)
         end
     }, true)
 end
 
-function M.deleteProfileMenu(path, group, config, profile)
+local function deleteProfileMenu(path, group, config, profile)
     local first_line = "  Are you sure you want to delete '"..profile.."'?"
     local width = #first_line + 2
 
@@ -1158,22 +1284,23 @@ function M.deleteProfileMenu(path, group, config, profile)
                 cfg.active = nil
             end
             cfg.profiles[profile] = nil
+            flagModified(path, group, config)
 
-            M.configProfilesMenu(path, group, config)
+            configProfilesMenu(path, group, config)
             p:close()
         end)
     end
     for _, tbl in pairs({ main_config.binds.cancel, { "n", "N" } }) do
         for _, bind in pairs(tbl) do
             p:setKeymap("n", bind, function()
-                M.configProfilesMenu(path, group, config)
+                configProfilesMenu(path, group, config)
                 p:close()
             end)
         end
     end
 end
 
-function M.renameProfileMenu(path, group, config, profile)
+local function renameProfileMenu(path, group, config, profile)
     local p
     p = PromptPopup:new({
         text = {
@@ -1201,24 +1328,17 @@ function M.renameProfileMenu(path, group, config, profile)
         on_confirm = function (name)
             config_data[path][group][config].profiles[name] = config_data[path][group][config].profiles[profile]
             config_data[path][group][config].profiles[profile] = nil
+            flagModified(path, group, config)
             p:close()
         end,
         on_close = function()
-            M.configProfilesMenu(path, group, config)
+            configProfilesMenu(path, group, config)
         end
     }, true)
 end
 
 ---opens the config menu for a specific configuration, listing available profiles
-function M.configProfilesMenu(path, group, config)
-    if
-        config_data[path] == nil
-        or config_data[path][group] == nil
-        or config_data[path][group][config] == nil
-    then
-        return
-    end
-
+configProfilesMenu = function(path, group, config)
     local cfg = config_data[path][group][config]
 
     ---@type PreviewedOption[]
@@ -1273,28 +1393,31 @@ function M.configProfilesMenu(path, group, config)
             if opt.profile == nil then
                 print("You may not edit defaults.")
             else
-                M.configProfileEditor(path, group, config, opt.profile)
+                configProfileEditor(path, group, config, opt.profile)
                 p:close()
             end
         end)
     end
     for _, bind in pairs(main_config.binds.new) do
         p:setKeymap("n", bind, function()
-            M.newProfileMenu(path, group, config)
+            newProfileMenu(path, group, config)
             p:close()
         end)
     end
     for _, bind in pairs(main_config.binds.select) do
         p:setKeymap("n", bind, function()
+            local option = p:getOption()
+            if cfg.active == option.profile then return end
+
             for _, opt in ipairs(options) do
                 if string.sub(opt.text, 1, 1) == "*" then
                     opt.text = " "..string.sub(opt.text, 2)
                     break
                 end
             end
-            local option = p:getOption()
             option.text = "*"..string.sub(option.text, 2)
             cfg.active = option.profile
+            flagModified(path, group, config)
             p:refreshText()
         end)
     end
@@ -1304,7 +1427,7 @@ function M.configProfilesMenu(path, group, config)
             if opt.profile == nil then
                 print("You may not rename defaults.")
             else
-                M.renameProfileMenu(path, group, config, opt.profile)
+                renameProfileMenu(path, group, config, opt.profile)
                 p:close()
             end
         end)
@@ -1315,7 +1438,7 @@ function M.configProfilesMenu(path, group, config)
             if opt.profile == nil then
                 print("You may not delete defaults.")
             else
-                M.deleteProfileMenu(path, group, config, opt.profile)
+                deleteProfileMenu(path, group, config, opt.profile)
                 p:close()
             end
         end)
@@ -1332,8 +1455,8 @@ function M.configMenu()
     ---@type PreviewedOption[]
     local options = {}
 
-    local dir_path = string.gsub(vim.fn.getcwd().."/", "\\", "/")
-    local file_path = file_path_tbl.file or ""
+    local dir_path = getcwd()
+    local file_path = director_state.file or ""
 
     local all_titles = true
 
@@ -1389,7 +1512,7 @@ function M.configMenu()
         for _, bind in pairs(tbl) do
             p:setKeymap("n", bind, function()
                 local opt = p:getOption()
-                M.configProfilesMenu(opt.path, opt.group, opt.config)
+                configProfilesMenu(opt.path, opt.group, opt.config)
                 p:close()
             end)
         end
@@ -1401,10 +1524,6 @@ end
 --  - add ability to set text based on line-and-text classes
 --
 --for director:
---  - test an action that reads from a config
---  - make config edits save to disk (when enabled)
---  - prevent creation of disk file structures when loading (and not saving) a config
---  - make director delete disk file structures if a config becomes empty
 --  - edit list input menu to better indicate which lines are empty vs not used
 --  - use oneup line and text classes to make config menus more pretty
 
