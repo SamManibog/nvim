@@ -1,23 +1,32 @@
 local M = {}
 
+local Popup = require("oneup.popup")
+local PromptPopup = require("oneup.prompt_popup")
 local OptionsPopup = require("oneup.options_popup")
+local PreviewPopup = require("oneup.previewed_options_popup")
 local utils = require("director.utils")
+
+---@alias ConfigFieldType
+---| '"string"'     a string value
+---| '"number"'     a number value
+---| '"boolean"'    a boolean value
+---| '"option"'     one (string) option from a provided list of options
+---| '"list"'       a list of strings
 
 ---@class ConfigField
 ---@field name string           the name/key for the field
 ---@field type ConfigFieldType  the datatype of the configuration fieldd
----@field default any           the default value (or function provider) of the field. type should match self.type
-
----@class ConfigDescriptor
----@field fields ConfigField[]              a list of possible fields for an action
----@field validate (fun(table): boolean)?   a function used to validate a configuration
+---@field default any           the default value (or function provider) for the field. type should match self.type. if type is option, default instead provides the options used where the first option provided is the true default value
+---@field validate (fun(any): boolean)?   a function used to validate the field
 
 ---@class DirectorBindsConfig
 ---@field up string[]           a list of binds used to move cursor upwards in the menus
 ---@field down string[]         a list of binds used to move cursor downwards in the menus
----@field confirm string[]      a list of binds used to confirm a selection
----@field edit string[]         a list of binds used to begin editing a config or field
----@field new string[]          a list of binds used to create a new config preset
+---@field select string[]       a list of binds used to confirm a selection or edit a profile
+---@field new string[]          a list of binds used to create a new config profile
+---@field rename string[]       a list of binds used to rename profiles
+---@field delete string[]       a list of binds used to delete profiles
+---@field edit string[]         a list of binds used to edit a config profile
 ---@field cancel string[]       a list of binds used to return to the previous menu (or close the menu)
 ---@field quick_menu string[]   a list of binds used to list all actions with keybinds
 ---@field file_menu string[]    a list of binds used to list all actions pertaining to the current file buffer
@@ -40,7 +49,7 @@ local utils = require("director.utils")
 ---@field file_local boolean?           Whether the action group applies to a certain file type (alternatively applying to the working directory)
 ---@field detect fun(): boolean         A function that determines if the actions in the group should be loaded
 ---@field actions ActionDescriptor[]    A list of actions belonging to the group
----@field config_types table<string, ConfigDescriptor>? a map defining names for config types, allowing them to be reused but work as configs for separate actions
+---@field config_types table<string, ConfigField[]>? a map defining names for config types, allowing them to be reused but work as configs for separate actions
 ---@field priority number?              If keybinds conflict, the default priority of all actions in the group (default 0 for cwd actions, 100 for file actions)
 
 ---@class DirectorConfig
@@ -56,7 +65,7 @@ local utils = require("director.utils")
 
 ---@alias ActionDataContainer { bound: table<bind, ActionDescriptor>, unbound: ActionDescriptor[] }
 
----@alias ConfigData { active: string?, presets: { [string]: table } } data for a configuration, including the active configuration and presets
+---@alias ConfigData { active: string?, profiles: { [string]: table } } data for a configuration, including the active configuration and profiles
 
 ---@type DirectorConfig
 local main_config = {} ---@diagnostic disable-line:missing-fields
@@ -83,6 +92,15 @@ local file_actions = {}
 -- a map bind -> bind info
 ---@type { [path]: table<bind, FileBindInfo> }
 local file_bind_info = {}
+
+---@type { file: string? }
+local file_path_tbl = {}
+
+---@return string
+local function getcwd()
+    local path, _ = string.gsub(vim.fn.getcwd().."/", "\\", "/")
+    return path
+end
 
 ---setup the plugin
 ---@param opts? table
@@ -128,7 +146,19 @@ function M.setup(opts)
         vim.keymap.set("n", bind, M.configMenu)
     end
 
-    --setup autocommands
+    --initial refresh of cwd actions
+    vim.api.nvim_create_autocmd(
+        'UIEnter',
+        {
+            callback = function()
+                M.refreshCwdActions()
+                file_actions = {}
+                file_bind_info = {}
+            end
+        }
+    )
+
+    --auto refresh cwd actions
     vim.api.nvim_create_autocmd(
         'DirChanged',
         {
@@ -141,24 +171,24 @@ function M.setup(opts)
         }
     )
 
+    --auto refresh file actions and current file
     vim.api.nvim_create_autocmd(
-        'UIEnter',
+        'BufEnter',
         {
             callback = function()
-                M.refreshCwdActions()
-                file_actions = {}
-                file_bind_info = {}
+                local path = vim.fn.expand("%:p")
+                path = string.gsub(path, "\\", "/")
+
+                if vim.fn.filereadable(path) == 1 then
+                    file_path_tbl.file = path
+                end
+
+                M.loadFileActions()
             end
         }
     )
 
-    vim.api.nvim_create_autocmd(
-        'BufEnter',
-        {
-            callback = M.loadFileActions
-        }
-    )
-
+    --Director command (to open menus)
     vim.api.nvim_create_user_command(
         "Director",
         function (cmd)
@@ -204,7 +234,12 @@ end
 local function queryManifest(path)
     --read/write to manifest file
     ---@type string
-    local data_path = vim.fn.stdpath("data") .. "/director"
+    local director_path = vim.fn.stdpath("data") .. "/director"
+    utils.mkdir(director_path)
+
+    ---@type string
+    local data_path = director_path .. "/" .. utils.getPathHash(path)
+    utils.mkdir(data_path)
 
     ---@type string
     local manifest_path = data_path .. "/manifest.json"
@@ -244,7 +279,7 @@ local function queryManifest(path)
     else
 
         --if manifest file does not exist, create a new one
-        M.mkdir(data_path)
+        utils.mkdir(data_path)
         local manifest_file = io.open(manifest_path, "w")
         if manifest_file ~= nil then
             manifest_file:write(vim.fn.json_encode({
@@ -258,45 +293,50 @@ local function queryManifest(path)
         folder_name = "0"
     end
 
-    return folder_name
+    --ensure the returned folder exists
+    utils.mkdir(data_path .. "/" .. folder_name)
+
+    return data_path .. "/" .. folder_name
 end
 
----determines if a configuration preset matches is descriptor
----@param preset table<string, any> the configuration
----@param config_desciptor ConfigDescriptor the specification for the config
+---determines if a configuration profile matches is descriptor
+---@param profile table<string, any> the configuration
+---@param profile_fields ConfigField[] the specification for the config
 ---@return table<string, any>? trimmed_config the configuration, trimmed of any extra/unspecified keys, or nil if the configuration is invalid
-local function isPresetValid(preset, config_desciptor)
+local function isProfileValid(profile, profile_fields)
     local out = {}
 
     --ensure fields match those in the config descriptor
-    for _, field in pairs(config_desciptor.fields) do
-        if preset[field.name] == nil then return nil end
+    for _, field in pairs(profile_fields) do
+        if profile[field.name] == nil then return nil end
 
-        local field_value = preset[field.name]
-        if field.type:sub(-4) ~= "list" then
-            if field.type ~= type(field_value) then return nil end
+        local field_value = profile[field.name]
+        if field.type == "option" then
+            if type(field_value) ~= "string" then return nil end
 
-        elseif field.type:sub(-4) == "list" then
+        elseif field.type == "list" then
             if type(field_value) ~= "table" then return nil end
-            local main_type = field.type:sub(1, -6)
 
             for _, item in pairs(field_value) do
-                if type(item) ~= main_type then return nil end
+                if type(item) ~= "string" then return nil end
             end
+        elseif field.type == "boolean" or field.type == "string" or field.type == "number" then
+            if type(field_value) ~= field.type then return nil end
         else
-            print("Invalid field type '" .. field.type .. "' in ConfigDescriptor.")
+            print("Invalid field type '" .. field.type .. "' in profile fields.")
             return
+        end
+
+        if field.validate ~= nil then
+            if not field.validate(profile[field.name]) then
+                return nil
+            end
         end
 
         out[field] = field_value
     end
 
-    --ensure config passes optional validation
-    if config_desciptor.validate == nil or config_desciptor.validate(out) then
-        return out
-    else
-        return nil
-    end
+    return out
 end
 
 ---saves to disk the data for the given group configuration
@@ -316,7 +356,7 @@ local function saveGroupConfig(path, group_name, config_name)
         config_file:write(vim.fn.json_encode(config_data[path][group_name][config_name]))
         config_file:close()
     else
-        error("Unable to save group config. Cannot write to file '" .. config_file .. "'.")
+        error("Unable to save group config. Cannot write to file '" .. config_path .. "'.")
     end
 end
 
@@ -326,7 +366,7 @@ end
 local function loadGroupConfigs(path, group_name)
     local group = main_config.actions[group_name]
     --skip the stress if theres nothing to load
-    if group.config_types == nil or #group.config_types <= 0 then
+    if group.config_types == nil or next(group.config_types) == nil then
         return
     end
 
@@ -353,29 +393,33 @@ local function loadGroupConfigs(path, group_name)
             ---@type ConfigData
             local config = utils.safeJsonDecode(config_path)
 
-            --load config presets
-            config_data[path][group_name][name] = { active = nil, presets = {} }
-            if config ~= nil and config.presets ~= nil then
-                for preset_name, preset in pairs(config.presets) do
-                    if not utils.isValidName(preset_name) then
+            --ensure config data is organized properly
+            if config_data[path] == nil then config_data[path] = {} end
+            if config_data[path][group_name] == nil then config_data[path][group_name] = {} end
+            config_data[path][group_name][name] = { active = nil, profiles = {} }
+
+            --load config profiles
+            if config ~= nil and config.profiles ~= nil then
+                for profile_name, profile in pairs(config.profiles) do
+                    if not utils.isValidName(profile_name) then
                         print(
-                            "Attempted to load preset with invalid name '" .. preset_name .. "'."
+                            "Attempted to load profile with invalid name '" .. profile_name .. "'."
                             .. "Names may only contain alphanumeric characters, underscores, and spaces."
                         )
                     else
-                        local updated_preset = isPresetValid(preset, group.config_types[name])
-                        if updated_preset ~= nil then
-                            config_data[path][group_name][name].presets[preset_name] = updated_preset
+                        local updated_profile = isProfileValid(profile, group.config_types[name])
+                        if updated_profile ~= nil then
+                            config_data[path][group_name][name].profiles[profile_name] = updated_profile
                         end
                     end
                 end
             end
 
-            --ensure active preset is still valid and load it if so
+            --ensure active profile is still valid and load it if so
             if
                 config ~= nil
                 and type(config.active) == "string"
-                and config_data[path][group_name][name].presets[config.active] ~= nil
+                and config_data[path][group_name][name].profiles[config.active] ~= nil
             then
                 config_data[path][group_name][name].active = config.active
             end
@@ -436,7 +480,7 @@ end
 
 ---refreshes actions belonging to the current working directory
 function M.refreshCwdActions()
-    local cwd = vim.fn.getcwd() .. "/"
+    local cwd = string.gsub(vim.fn.getcwd().."/", "\\", "/")
 
     cwd_actions = {}
     cwd_bind_info = {}
@@ -465,10 +509,8 @@ end
 
 ---refreshes actions belonging to the current working directory
 function M.loadFileActions()
-    local path = vim.fn.expand("%:p")
-
-    if vim.fn.filereadable(path) ~= 1 then return end
-    if file_actions[path] ~= nil then return end
+    local path = file_path_tbl.file
+    if path == nil or file_actions[file_path_tbl.file] ~= nil then return end
 
     file_actions[path] = {}
     file_bind_info[path] = {}
@@ -508,10 +550,11 @@ function M.getActionConfigs(path, group_name, action_configs)
     local action_data = config_data[path][group_name]
 
     for _, config_name in pairs(action_configs) do
-        table.insert(
-            out,
-            action_data[config_name].presets[action_data[config_name].active]
-        )
+        if action_data[config_name].active == nil then
+            out[config_name] = utils.getDefaultProfile(main_config.actions[group_name].config_types[config_name])
+        else
+            out[config_name] = action_data[config_name].profiles[action_data[config_name].active]
+        end
     end
 
     return out
@@ -552,7 +595,7 @@ function openActionsMenu(title, actions, file_path)
         if main_config.actions[group_name].file_local then
             path = file_path
         else
-            path = vim.fn.getcwd().."/"
+            path = string.gsub(vim.fn.getcwd().."/", "\\", "/")
         end
 
         --generate bound options
@@ -615,7 +658,7 @@ function openActionsMenu(title, actions, file_path)
     }, true)
 
     --set keybinds
-    for _, confirm_bind in pairs(main_config.binds.confirm) do
+    for _, confirm_bind in pairs(main_config.binds.select) do
         p:setKeymap("n", confirm_bind, function()
             p:getOption().callback()
             p:close()
@@ -642,7 +685,7 @@ function M.quickMenu()
         actions[bind_info.group_name].bound[bind] = cwd_actions[bind_info.group_name].bound[bind]
     end
 
-    local file_path = vim.fn.expand("%:p")
+    local file_path = file_path_tbl.file or ""
     if vim.fn.filereadable(file_path) == 1 then
         for bind, bind_info in pairs(file_bind_info[file_path]) do
             if actions[bind_info.group_name] == nil then
@@ -678,14 +721,14 @@ end
 
 ---accesses all detected actions for the cwd
 function M.directoryMenu()
-    local file_path = vim.fn.expand("%:p")
+    local file_path = file_path_tbl.file or ""
 
     openActionsMenu(" Directory Actions ", cwd_actions, file_path)
 end
 
 ---accesses all detected active file-specific actions
 function M.fileMenu()
-    local file_path = vim.fn.expand("%:p")
+    local file_path = file_path_tbl.file or ""
 
     if vim.fn.filereadable(file_path) == 1 then
         openActionsMenu(" File Actions ", file_actions[file_path], file_path)
@@ -711,7 +754,7 @@ function M.mainMenu()
         end
     end
 
-    local file_path = vim.fn.expand("%:p")
+    local file_path = file_path_tbl.file or ""
     if vim.fn.filereadable(file_path) == 1 then
         for name, group in pairs(file_actions[file_path]) do
             actions[name] = { bound = {}, unbound = {} }
@@ -747,11 +790,622 @@ function M.mainMenu()
     openActionsMenu(" Actions ", actions, file_path)
 end
 
+---opens the config menu for a specific field in a configuration
+function M.configFieldMenu(path, group, config, profile, field)
+    ---@type ConfigField
+    local desc
+    do
+        local fields = main_config.actions[group].config_types[config]
+        for _, field_desc in pairs(fields) do
+            if field_desc.name == field then
+                desc = field_desc
+                break
+            end
+        end
+    end
+
+    if desc.type == "string" then
+        local p
+        p = PromptPopup:new({
+            text = {},
+            prompt = "> ",
+            title = " "..field.." ",
+            verify_input = desc.validate,
+            width = { min = 40, value = "50%" },
+            close_bind = main_config.binds.cancel,
+            on_confirm = function (text)
+                config_data[path][group][config].profiles[profile][field] = text
+                p:close()
+            end,
+            on_close = function()
+                M.configProfileEditor(path, group, config, profile)
+            end
+        }, true)
+
+    elseif desc.type == "number" then
+        local validate
+        if desc.validate ~= nil then
+            ---@param text string
+            ---@return boolean
+            validate = function(text)
+                local num = tonumber(text)
+                if num == nil then
+                    print("Input should be a number. '"..text.."' is not a number.")
+                    return false
+                else
+                    return desc.validate(num)
+                end
+            end
+        else
+            ---@param text string
+            ---@return boolean
+            validate = function(text)
+                local num = tonumber(text)
+                if num == nil then
+                    print("Input should be a number. '"..text.."' is not a number.")
+                    return false
+                end
+                return true
+            end
+        end
+
+        local p
+        p = PromptPopup:new({
+            text = {},
+            prompt = "> ",
+            title = " "..field.." ",
+            verify_input = validate,
+            width = { min = 40, value = "50%" },
+            close_bind = main_config.binds.cancel,
+            on_confirm = function (text)
+                config_data[path][group][config].profiles[profile][field] = text
+                p:close()
+            end,
+            on_close = function()
+                M.configProfileEditor(path, group, config, profile)
+            end
+        }, true)
+
+    elseif desc.type == "option" then
+        ---@type string[]
+        local options_raw
+        if type(desc.default) == "function" then
+            options_raw = desc.default()
+        else
+            options_raw = desc.default
+        end
+
+        ---@type Option[]
+        local options = {}
+        for _, option_text in pairs(options_raw) do
+            table.insert(options, { text = option_text })
+        end
+
+        local p = OptionsPopup:new({
+            options = options,
+            title = " "..field.." ",
+            width = { min = 40, value = "50%" },
+            close_bind = main_config.binds.cancel,
+            next_bind = main_config.binds.down,
+            previous_bind = main_config.binds.up,
+            height = { min = 5, max = "70%" },
+            on_close = function()
+                M.configProfileEditor(path, group, config, profile)
+            end
+        }, true)
+        for _, bind in pairs(main_config.binds.select) do
+            p:setKeymap("n", bind, function()
+                config_data[path][group][config].profiles[profile][field] = p:getOption().text
+                p:close()
+            end)
+        end
+
+    elseif desc.type == "list" then
+        local p
+        p = Popup:new({
+            title = " "..field.." ",
+            text = config_data[path][group][config].profiles[profile][field],
+            width = { min = 40, value = "50%" },
+            height = { min = 20, value = "50%" },
+            modifiable = true,
+            close_bind = main_config.binds.cancel,
+            on_close = function()
+                if p.write_autocmd ~= nil then
+                    vim.api.nvim_del_autocmd(p.write_autocmd)
+                    p.write_autocmd = nil ---@diagnostic disable-line:inject-field
+                end
+                M.configProfileEditor(path, group, config, profile)
+            end
+        }, true)
+        vim.api.nvim_set_option_value("buftype", "acwrite", { buf = p:bufId() })
+        vim.api.nvim_buf_set_name(p:bufId(), vim.fn.stdpath("data").."/dne.txt")
+        p.write_autocmd = vim.api.nvim_create_autocmd({ "BufWriteCmd" }, ---@diagnostic disable-line:inject-field
+            {
+                buffer = p:bufId(),
+                callback = function()
+                    local value = p:getText()
+                    if desc.validate ~= nil and not desc.validate(p:getText()) then
+                        print("Invalid value. Not saved.")
+                        return
+                    end
+                    vim.api.nvim_set_option_value("modified", false, { buf = p:bufId() })
+                    print("Saved.")
+                    config_data[path][group][config].profiles[profile][field] = value
+                end
+            }
+        )
+
+    elseif desc.type == "boolean" then
+        ---@type Option[]
+        local options = { { text = "true", value = true }, { text = "false", value = false } }
+        local p = OptionsPopup:new({
+            options = options,
+            title = " "..field.." ",
+            width = { min = 40, value = "50%" },
+            close_bind = main_config.binds.cancel,
+            next_bind = main_config.binds.down,
+            previous_bind = main_config.binds.up,
+            height = { min = 5, max = "70%" },
+            on_close = function()
+                M.configProfileEditor(path, group, config, profile)
+            end
+        }, true)
+
+        for _, bind in pairs(main_config.binds.select) do
+            p:setKeymap("n", bind, function()
+                config_data[path][group][config].profiles[profile][field] = p:getOption().value
+                p:close()
+            end)
+        end
+    else
+        error("Invalid field type '"..desc.type.."'.")
+    end
+end
+
+---opens the config menu for a specific profile
+function M.configProfileEditor (path, group, config, profile)
+    local cfg = config_data[path][group][config].profiles[profile]
+    local fields = main_config.actions[group].config_types[config]
+
+    ---@type PreviewedOption[]
+    local options = {}
+
+    for _, field in pairs(fields) do
+        table.insert(options, {
+            text = field.name,
+            preview = function(_)
+                local value = cfg[field.name]
+
+                if type(value) == "table" then
+                    local out = {}
+                    for _, entry in ipairs(value) do
+                        table.insert(out, tostring(entry))
+                    end
+                    return out
+                else
+                    return { tostring(value) }
+                end
+            end,
+            boolean = field.type == "boolean"
+        })
+    end
+
+    local p = PreviewPopup:new({
+        options_opts = {
+            title = " "..profile.." Fields ",
+            width = { min = 20 }
+        },
+        preview_opts = {
+            title = " Value ",
+            width = { min = 24, value = "50%" }
+        },
+        height = { min = 10, value = "70%" },
+        options = options,
+        next_bind = main_config.binds.down,
+        previous_bind = main_config.binds.up,
+        close_bind = {}
+    }, true)
+
+    for _, tbl in pairs({ main_config.binds.select, main_config.binds.edit }) do
+        for _, bind in pairs(tbl) do
+            p:setKeymap("n", bind, function()
+                local opt = p:getOption()
+                if opt.boolean then
+                    cfg[opt.text] = not cfg[opt.text]
+                    p:reloadPreview()
+                else
+                    M.configFieldMenu(path, group, config, profile, opt.text)
+                    p:close()
+                end
+            end)
+        end
+    end
+    for _, bind in pairs(main_config.binds.cancel) do
+        p:setKeymap("n", bind, function()
+            M.configProfilesMenu(path, group, config)
+        end)
+    end
+end
+
+---@param path string
+---@param group string
+---@param config string
+---@param profile? string
+---@param show_profile? boolean
+---@return string[]
+local function configPreview(path, group, config, profile, show_profile)
+    local profile = profile ---@diagnostic disable-line:redefined-local
+    if
+        config_data[path] == nil
+        or config_data[path][group] == nil
+        or config_data[path][group][config] == nil
+    then
+        error("Invalid config preview")
+    end
+    if profile == nil then
+        profile = config_data[path][group][config].active
+    end
+
+    local cfg = config_data[path][group][config].profiles[profile]
+    local fields = main_config.actions[group].config_types[config]
+
+    local out
+
+    if show_profile then
+        if profile == nil then
+            out = { "PROFILE: [DEFAULT]" }
+        else
+            out = { "PROFILE: "..profile }
+        end
+    else
+        out = {}
+    end
+
+    if profile == nil then
+        for _, field in pairs(fields) do
+            local value
+            if type(field.default) == "function" then
+                value = field.default()
+            else
+                value = field.default
+            end
+
+            if field.type == "list" then
+                table.insert(out, field.name..":")
+                for _, entry in ipairs(value) do
+                    table.insert(out, "\t"..tostring(entry))
+                end
+            elseif field.type == "option" then
+                table.insert(out, field.name..": "..tostring(value[1]))
+            else
+                table.insert(out, field.name..": "..tostring(value))
+            end
+        end
+
+    else
+        for _, field in pairs(fields) do
+            local value = cfg[field.name]
+            if field.type == "list" then
+                table.insert(out, field.name..":")
+                for _, entry in ipairs(value) do
+                    table.insert(out, "\t"..tostring(entry))
+                end
+            else
+                table.insert(out, field.name..": "..tostring(value))
+            end
+        end
+    end
+
+    return out
+end
+
+function M.newProfileMenu(path, group, config)
+    local p
+    p = PromptPopup:new({
+        text = {
+            "Enter a name for your new profile.",
+            "Names may only contain alphanumeric",
+            "characters, spaces, and underscores"
+        },
+        prompt = "> ",
+        title = " New Profile ",
+        verify_input = function(name)
+            if utils.isValidName(name) then
+                if config_data[path][group][config].profiles[name] == nil then
+                    return true
+                else
+                    print("A profile named '"..name.."' already exists.")
+                    return false
+                end
+            else
+                print("Name '"..name.."' is invalid.")
+                return false
+            end
+        end,
+        width = { min = 40, value = "50%" },
+        close_bind = main_config.binds.cancel,
+        on_confirm = function (name)
+            config_data[path][group][config].profiles[name] = utils.getDefaultProfile(
+                main_config.actions[group].config_types[config]
+            )
+            p:close()
+        end,
+        on_close = function()
+            M.configProfilesMenu(path, group, config)
+        end
+    }, true)
+end
+
+function M.deleteProfileMenu(path, group, config, profile)
+    local first_line = "  Are you sure you want to delete '"..profile.."'?"
+    local width = #first_line + 2
+
+    local p = Popup:new({
+        width = width,
+        text = {
+            first_line,
+            string.rep(" ", math.floor((width - 28) / 2.0)).."This action cannot be undone.",
+            "",
+            "     Yes - [y/Y]"..string.rep(" ", width - 31).."No  - [n/N]",
+        },
+        title = " Delete Profile ",
+    }, true)
+
+    for _, bind in pairs({ "y", "Y" }) do
+        p:setKeymap("n", bind, function()
+            local cfg = config_data[path][group][config]
+            if cfg.active == profile then
+                cfg.active = nil
+            end
+            cfg.profiles[profile] = nil
+
+            M.configProfilesMenu(path, group, config)
+            p:close()
+        end)
+    end
+    for _, tbl in pairs({ main_config.binds.cancel, { "n", "N" } }) do
+        for _, bind in pairs(tbl) do
+            p:setKeymap("n", bind, function()
+                M.configProfilesMenu(path, group, config)
+                p:close()
+            end)
+        end
+    end
+end
+
+function M.renameProfileMenu(path, group, config, profile)
+    local p
+    p = PromptPopup:new({
+        text = {
+            "Enter a new name for "..profile..".",
+            "Names may only contain alphanumeric",
+            "characters, spaces, and underscores"
+        },
+        prompt = "> ",
+        title = " Rename Profile ",
+        verify_input = function(name)
+            if utils.isValidName(name) then
+                if config_data[path][group][config].profiles[name] == nil then
+                    return true
+                else
+                    print("A profile named '"..name.."' already exists.")
+                    return false
+                end
+            else
+                print("New name '"..name.."' is invalid.")
+                return false
+            end
+        end,
+        width = { min = 40, value = "50%" },
+        close_bind = main_config.binds.cancel,
+        on_confirm = function (name)
+            config_data[path][group][config].profiles[name] = config_data[path][group][config].profiles[profile]
+            config_data[path][group][config].profiles[profile] = nil
+            p:close()
+        end,
+        on_close = function()
+            M.configProfilesMenu(path, group, config)
+        end
+    }, true)
+end
+
+---opens the config menu for a specific configuration, listing available profiles
+function M.configProfilesMenu(path, group, config)
+    if
+        config_data[path] == nil
+        or config_data[path][group] == nil
+        or config_data[path][group][config] == nil
+    then
+        return
+    end
+
+    local cfg = config_data[path][group][config]
+
+    ---@type PreviewedOption[]
+    local options = {
+        {
+            preview = function(_)
+                return configPreview(path, group, config, cfg.active, false)
+            end,
+        }
+    }
+    if cfg.active == nil then
+        options[1].text = "* [DEFAULT]"
+    else
+        options[1].text = "  [DEFAULT]"
+    end
+
+    for name, _ in pairs(cfg.profiles) do
+        local text
+        if cfg.active == name then
+            text = "* "..name
+        else
+            text = "  "..name
+        end
+        table.insert(options, {
+            text = text,
+            preview = function(_)
+                return configPreview(path, group, config, name, false)
+            end,
+            profile = name
+        })
+    end
+
+    local p = PreviewPopup:new({
+        options_opts = {
+            title = " "..config.." Profiles ",
+            width = { min = 20 }
+        },
+        preview_opts = {
+            title = " Profile Data ",
+            width = { min = 24, value = "50%" }
+        },
+        height = { min = 10, value = "70%" },
+        options = options,
+        next_bind = main_config.binds.down,
+        previous_bind = main_config.binds.up,
+        close_bind = {}
+    }, true)
+
+    for _, bind in pairs(main_config.binds.edit) do
+        p:setKeymap("n", bind, function()
+            local opt = p:getOption()
+            if opt.profile == nil then
+                print("You may not edit defaults.")
+            else
+                M.configProfileEditor(path, group, config, opt.profile)
+                p:close()
+            end
+        end)
+    end
+    for _, bind in pairs(main_config.binds.new) do
+        p:setKeymap("n", bind, function()
+            M.newProfileMenu(path, group, config)
+            p:close()
+        end)
+    end
+    for _, bind in pairs(main_config.binds.select) do
+        p:setKeymap("n", bind, function()
+            for _, opt in ipairs(options) do
+                if string.sub(opt.text, 1, 1) == "*" then
+                    opt.text = " "..string.sub(opt.text, 2)
+                    break
+                end
+            end
+            local option = p:getOption()
+            option.text = "*"..string.sub(option.text, 2)
+            cfg.active = option.profile
+            p:refreshText()
+        end)
+    end
+    for _, bind in pairs(main_config.binds.rename) do
+        p:setKeymap("n", bind, function()
+            local opt = p:getOption()
+            if opt.profile == nil then
+                print("You may not rename defaults.")
+            else
+                M.renameProfileMenu(path, group, config, opt.profile)
+                p:close()
+            end
+        end)
+    end
+    for _, bind in pairs(main_config.binds.delete) do
+        p:setKeymap("n", bind, function()
+            local opt = p:getOption()
+            if opt.profile == nil then
+                print("You may not delete defaults.")
+            else
+                M.deleteProfileMenu(path, group, config, opt.profile)
+                p:close()
+            end
+        end)
+    end
+    for _, bind in pairs(main_config.binds.cancel) do
+        p:setKeymap("n", bind, function()
+            M.configMenu()
+        end)
+    end
+end
+
 ---accesses mainMenu action configurations
 function M.configMenu()
-    local fields = {}
+    ---@type PreviewedOption[]
+    local options = {}
 
-    error("todo")
+    local dir_path = string.gsub(vim.fn.getcwd().."/", "\\", "/")
+    local file_path = file_path_tbl.file or ""
+
+    local all_titles = true
+
+    local append_configs = function(path)
+        if config_data[path] == nil then return end
+
+        for group_name, config_list in pairs(config_data[path]) do
+            table.insert(options, {
+                text = group_name,
+                is_title = true,
+                preview = {}
+            })
+
+            for config_name, _ in pairs(config_list) do
+                all_titles = false
+                table.insert(options, {
+                    text = config_name,
+                    preview = function(_)
+                        return configPreview(path, group_name, config_name, nil, true)
+                    end,
+                    path = path,
+                    group = group_name,
+                    config = config_name
+                })
+            end
+        end
+    end
+    append_configs(dir_path)
+    append_configs(file_path)
+
+    if all_titles then
+        print("No actions are configurable in this context.")
+        return
+    end
+
+    local p = PreviewPopup:new({
+        options_opts = {
+            title = " Configurations ",
+            width = { min = 20 }
+        },
+        preview_opts = {
+            title = " Active Configuration ",
+            width = { min = 24, value = "50%" }
+        },
+        height = { min = 10, value = "70%" },
+        options = options,
+        next_bind = main_config.binds.down,
+        previous_bind = main_config.binds.up,
+        close_bind = main_config.binds.cancel
+    }, true)
+
+    for _, tbl in pairs({ main_config.binds.select, main_config.binds.edit }) do
+        for _, bind in pairs(tbl) do
+            p:setKeymap("n", bind, function()
+                local opt = p:getOption()
+                M.configProfilesMenu(opt.path, opt.group, opt.config)
+                p:close()
+            end)
+        end
+    end
 end
+
+--todo:
+--for oneup:
+--  - add ability to set text based on line-and-text classes
+--
+--for director:
+--  - test an action that reads from a config
+--  - make config edits save to disk (when enabled)
+--  - prevent creation of disk file structures when loading (and not saving) a config
+--  - make director delete disk file structures if a config becomes empty
+--  - edit list input menu to better indicate which lines are empty vs not used
+--  - use oneup line and text classes to make config menus more pretty
 
 return M

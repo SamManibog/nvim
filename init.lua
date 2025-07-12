@@ -12,7 +12,5 @@ require("director").setup({
     }
 })
 
---require("config.buildsystems")
-
--- Set color scheme
+-- Set colorscheme
 vim.cmd.colorscheme("gruvbox")
