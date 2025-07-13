@@ -4,6 +4,8 @@ local Popup = require("oneup.popup")
 local PromptPopup = require("oneup.prompt_popup")
 local OptionsPopup = require("oneup.options_popup")
 local PreviewPopup = require("oneup.previewed_options_popup")
+local Line = require("oneup.line")
+local Text = require("oneup.text")
 local utils = require("director.utils")
 
 ---@alias ConfigFieldType
@@ -975,7 +977,7 @@ configFieldMenu = function(path, group, config, profile, field)
             prompt = "> ",
             title = " "..field.." ",
             verify_input = validate,
-            width = { min = 40, value = "50%" },
+            width = { min = 40, value = "20%" },
             close_bind = main_config.binds.cancel,
             on_confirm = function (text)
                 config_data[path][group][config].profiles[profile][field] = text
@@ -1005,7 +1007,7 @@ configFieldMenu = function(path, group, config, profile, field)
         local p = OptionsPopup:new({
             options = options,
             title = " "..field.." ",
-            width = { min = 40, value = "50%" },
+            width = { min = 40, value = "30%" },
             close_bind = main_config.binds.cancel,
             next_bind = main_config.binds.down,
             previous_bind = main_config.binds.up,
@@ -1040,7 +1042,8 @@ configFieldMenu = function(path, group, config, profile, field)
             end
         }, true)
         vim.api.nvim_set_option_value("buftype", "acwrite", { buf = p:bufId() })
-        vim.api.nvim_buf_set_name(p:bufId(), vim.fn.stdpath("data").."/dne.txt")
+        vim.api.nvim_set_option_value("signcolumn", "yes", { win = p:winId() })
+        vim.api.nvim_set_option_value("winhighlight", "Normal:Normal", { scope = "local", win = p:winId() })
         p.write_autocmd = vim.api.nvim_create_autocmd({ "BufWriteCmd" }, ---@diagnostic disable-line:inject-field
             {
                 buffer = p:bufId(),
@@ -1086,6 +1089,19 @@ configFieldMenu = function(path, group, config, profile, field)
     end
 end
 
+---converts a config field type to its respective highlight group
+---@param type ConfigFieldType
+---@return string
+local function typeToHl(type)
+    if type == "number" then
+        return "Number"
+    elseif type == "boolean" then
+        return "Boolean"
+    else
+        return "String"
+    end
+end
+
 ---opens the config menu for a specific profile
 configProfileEditor = function(path, group, config, profile)
     local cfg = config_data[path][group][config].profiles[profile]
@@ -1100,14 +1116,20 @@ configProfileEditor = function(path, group, config, profile)
             preview = function(_)
                 local value = cfg[field.name]
 
-                if type(value) == "table" then
+                if field.type == "list" then
                     local out = {}
                     for _, entry in ipairs(value) do
-                        table.insert(out, tostring(entry))
+                        table.insert(out, Line("\""..tostring(entry).."\"", { hl_group = "String" }))
                     end
                     return out
                 else
-                    return { tostring(value) }
+                    if field.type == "option" or field.type == "string" then
+                        value = "\""..tostring(value).."\""
+                    else
+                        value = tostring(value)
+                    end
+
+                    return { Line(value, { hl_group = typeToHl(field.type) }) }
                 end
             end,
             boolean = field.type == "boolean"
@@ -1117,13 +1139,13 @@ configProfileEditor = function(path, group, config, profile)
     local p = PreviewPopup:new({
         options_opts = {
             title = " "..profile.." Fields ",
-            width = { min = 20 }
+            width = { min = 24, value = "20%" }
         },
         preview_opts = {
             title = " Value ",
-            width = { min = 24, value = "50%" }
+            width = { min = 24, value = "30%" }
         },
-        height = { min = 10, value = "70%" },
+        height = { min = 10, value = "40%" },
         options = options,
         next_bind = main_config.binds.down,
         previous_bind = main_config.binds.up,
@@ -1157,7 +1179,7 @@ end
 ---@param config string
 ---@param profile? string
 ---@param show_profile? boolean
----@return string[]
+---@return Line[]
 local function configPreview(path, group, config, profile, show_profile)
     local profile = profile ---@diagnostic disable-line:redefined-local
     if
@@ -1178,9 +1200,9 @@ local function configPreview(path, group, config, profile, show_profile)
 
     if show_profile then
         if profile == nil then
-            out = { "PROFILE: [DEFAULT]" }
+            out = { Line("PROFILE: [DEFAULT]", { hl_group = "PreProc"} ) }
         else
-            out = { "PROFILE: "..profile }
+            out = { Line("PROFILE: "..profile, { hl_group = "PreProc"} ) }
         end
     else
         out = {}
@@ -1196,27 +1218,54 @@ local function configPreview(path, group, config, profile, show_profile)
             end
 
             if field.type == "list" then
-                table.insert(out, field.name..":")
+                table.insert(out, Line({
+                    Text(field.name, { hl_group = "Identifier" }),
+                    Text(":", { hl_group = "Operator" })
+                }))
                 for _, entry in ipairs(value) do
-                    table.insert(out, "\t"..tostring(entry))
+                    table.insert(out, Line("\t\""..tostring(entry).."\"", { hl_group = "String" }))
                 end
-            elseif field.type == "option" then
-                table.insert(out, field.name..": "..tostring(value[1]))
             else
-                table.insert(out, field.name..": "..tostring(value))
+                if field.type == "option" then
+                    value = "\""..tostring(value[1]).."\""
+                elseif field.type == "string" then
+                    value = "\""..value.."\""
+                else
+                    value = tostring(value)
+                end
+
+                table.insert(out, Line({
+                    Text(field.name, { hl_group = "Identifier" }),
+                    Text(":", { hl_group = "Operator" }),
+                    Text(" "..value, { hl_group = typeToHl(field.type) }),
+                }))
             end
         end
 
     else
         for _, field in pairs(fields) do
             local value = cfg[field.name]
+
             if field.type == "list" then
-                table.insert(out, field.name..":")
+                table.insert(out, Line({
+                    Text(field.name, { hl_group = "Identifier" }),
+                    Text(":", { hl_group = "Operator" })
+                }))
                 for _, entry in ipairs(value) do
-                    table.insert(out, "\t"..tostring(entry))
+                    table.insert(out, Line("\t\""..tostring(entry).."\"", { hl_group = "String" }))
                 end
             else
-                table.insert(out, field.name..": "..tostring(value))
+                if field.type == "string" or field.type == "option" then
+                    value = "\""..value.."\""
+                else
+                    value = tostring(value)
+                end
+
+                table.insert(out, Line({
+                    Text(field.name, { hl_group = "Identifier" }),
+                    Text(":", { hl_group = "Operator" }),
+                    Text(" "..value, { hl_group = typeToHl(field.type) }),
+                }))
             end
         end
     end
@@ -1520,11 +1569,6 @@ function M.configMenu()
 end
 
 --todo:
---for oneup:
---  - add ability to set text based on line-and-text classes
---
---for director:
---  - edit list input menu to better indicate which lines are empty vs not used
 --  - use oneup line and text classes to make config menus more pretty
 
 return M
