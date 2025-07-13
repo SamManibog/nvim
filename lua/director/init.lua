@@ -1189,9 +1189,6 @@ local function configPreview(path, group, config, profile, show_profile)
     then
         error("Invalid config preview")
     end
-    if profile == nil then
-        profile = config_data[path][group][config].active
-    end
 
     local cfg = config_data[path][group][config].profiles[profile]
     local fields = main_config.actions[group].config_types[config]
@@ -1403,7 +1400,7 @@ configProfilesMenu = function(path, group, config)
     local options = {
         {
             preview = function(_)
-                return configPreview(path, group, config, cfg.active, false)
+                return configPreview(path, group, config, nil, false)
             end,
         }
     }
