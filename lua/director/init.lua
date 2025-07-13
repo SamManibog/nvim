@@ -1277,9 +1277,10 @@ local function newProfileMenu(path, group, config)
     local p
     p = PromptPopup:new({
         text = {
-            "Enter a name for your new profile.",
-            "Names may only contain alphanumeric",
-            "characters, spaces, and underscores"
+            Line("Enter a name for your new profile.", { align = "center" }),
+            Line("Names may only contain alphanumeric", { align = "center" }),
+            Line("characters, spaces, and underscores", { align = "center" }),
+            ""
         },
         prompt = "> ",
         title = " New Profile ",
@@ -1296,7 +1297,7 @@ local function newProfileMenu(path, group, config)
                 return false
             end
         end,
-        width = { min = 40, value = "50%" },
+        width = { min = 20, value = "30%" },
         close_bind = main_config.binds.cancel,
         on_confirm = function (name)
             config_data[path][group][config].profiles[name] = utils.getDefaultProfile(
@@ -1319,9 +1320,16 @@ local function deleteProfileMenu(path, group, config, profile)
         width = width,
         text = {
             first_line,
-            string.rep(" ", math.floor((width - 28) / 2.0)).."This action cannot be undone.",
+            Line("This action cannot be undone.", { hl_group = "DiagnosticError", align = "center"}),
             "",
-            "     Yes - [y/Y]"..string.rep(" ", width - 31).."No  - [n/N]",
+            Line(
+                {
+                    Text("Yes - [y/Y]", { hl_group = "DiffAdd" }),
+                    Text("        "),
+                    Text("No - [n/N]", { hl_group = "DiffDelete" })
+                },
+                { align = "center" }
+            )
         },
         title = " Delete Profile ",
     }, true)
@@ -1353,9 +1361,10 @@ local function renameProfileMenu(path, group, config, profile)
     local p
     p = PromptPopup:new({
         text = {
-            "Enter a new name for "..profile..".",
-            "Names may only contain alphanumeric",
-            "characters, spaces, and underscores"
+            Line("Enter a new name for "..profile..".", { align = "center" }),
+            Line("Names may only contain alphanumeric", { align = "center" }),
+            Line("characters, spaces, and underscores", { align = "center" }),
+            ""
         },
         prompt = "> ",
         title = " Rename Profile ",
@@ -1372,7 +1381,7 @@ local function renameProfileMenu(path, group, config, profile)
                 return false
             end
         end,
-        width = { min = 40, value = "50%" },
+        width = { min = 20, value = "30%" },
         close_bind = main_config.binds.cancel,
         on_confirm = function (name)
             config_data[path][group][config].profiles[name] = config_data[path][group][config].profiles[profile]
