@@ -70,7 +70,7 @@ local utils = require("director.utils")
 
 ---@alias ConfigData { active: string?, profiles: { [string]: table } } data for a configuration, including the active configuration and profiles
 
----@type DirectorConfig
+---@type DirectorConfig global *CONSTANT* state
 local main_config = {} ---@diagnostic disable-line:missing-fields
 
 --action configuration
@@ -721,7 +721,7 @@ function openActionsMenu(title, actions, file_path)
             --determine keymap callback
             ---@type function
             local callback
-            if action.configs == nil then
+            if action.configs == nil or next(action.configs) == nil then
                 callback = action.callback
             else
                 callback = function()
@@ -742,7 +742,7 @@ function openActionsMenu(title, actions, file_path)
             --determine keymap callback
             ---@type function
             local callback
-            if action.configs ~= nil then
+            if action.configs == nil or next(action.configs) == nil then
                 callback = action.callback
             else
                 callback = function()
@@ -878,24 +878,28 @@ function M.mainMenu()
             actions[name] = { bound = {}, unbound = {} }
 
             for bind, action in pairs(group.bound) do
-
-                local priority = 100
-                if action.priority ~= nil then
-                    priority = action.priority
-                end
-
-                local cwd_priority = 0
-                local cwd_group = cwd_bind_info[bind].group_name
-                if cwd_bind_info[bind].priority ~= nil then
-                    cwd_priority = cwd_bind_info[bind].priority
-                end
-
-                if priority >= cwd_priority then
+                if cwd_bind_info[bind] == nil then
                     actions[name].bound[bind] = action
-                    table.insert(actions[cwd_group].unbound, actions[cwd_group].bound[bind])
-                    actions[cwd_group].bound[bind] = nil
                 else
-                    table.insert(actions[name].unbound, action)
+
+                    local priority = 100
+                    if action.priority ~= nil then
+                        priority = action.priority
+                    end
+
+                    local cwd_priority = 0
+                    local cwd_group = cwd_bind_info[bind].group_name
+                    if cwd_bind_info[bind].priority ~= nil then
+                        cwd_priority = cwd_bind_info[bind].priority
+                    end
+
+                    if priority >= cwd_priority then
+                        actions[name].bound[bind] = action
+                        table.insert(actions[cwd_group].unbound, actions[cwd_group].bound[bind])
+                        actions[cwd_group].bound[bind] = nil
+                    else
+                        table.insert(actions[name].unbound, action)
+                    end
                 end
             end
 

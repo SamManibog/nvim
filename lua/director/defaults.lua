@@ -7,7 +7,7 @@ return {
         rename =            { "r", "R" },
         delete =            { "d", "D" },
         select =            { "<CR>", "<Space>" },
-        edit =              { "e", "E" },
+        edit =              { "e", "E", "i", "I", "a", "A" },
         cancel =            { "<C-c>", "<Esc>" },
         up =                { "k", "<Up>" },
         down =              { "j", "<Down>" },
