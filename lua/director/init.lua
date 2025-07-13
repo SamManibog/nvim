@@ -980,7 +980,7 @@ configFieldMenu = function(path, group, config, profile, field)
             width = { min = 40, value = "20%" },
             close_bind = main_config.binds.cancel,
             on_confirm = function (text)
-                config_data[path][group][config].profiles[profile][field] = text
+                config_data[path][group][config].profiles[profile][field] = tonumber(text)
                 flagModified(path, group, config)
                 p:close()
             end,
