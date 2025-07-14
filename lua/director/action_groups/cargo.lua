@@ -2,7 +2,9 @@ local utils = require("director.utils")
 
 ---@type ActionGroup
 return {
-    detect = utils.detectCargo,
+    detect = function()
+        return vim.fn.filereadable(vim.fn.getcwd().. "/Cargo.toml") == 1
+    end,
     actions = {
         {
             bind = "cc",

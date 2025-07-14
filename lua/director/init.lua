@@ -20,6 +20,7 @@ local utils = require("director.utils")
 ---@field type ConfigFieldType  the datatype of the configuration fieldd
 ---@field default any           the default value (or function provider) for the field. type should match self.type. if type is option, default instead provides the options used where the first option provided is the true default value
 ---@field validate (fun(any): boolean)?   a function used to validate the field
+---@field options nil|string[]|(fun():string[]) a function used to provide option values when type is set to "option"
 
 ---@class DirectorBindsConfig
 ---@field up string[]           a list of binds used to move cursor upwards in the menus
@@ -112,6 +113,58 @@ end
 local function getcwd()
     local path, _ = string.gsub(vim.fn.getcwd().."/", "\\", "/")
     return path
+end
+
+---@type string[]
+local path_hash_valid_characters = {}
+for char in string.gmatch("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789", ".") do
+    table.insert(path_hash_valid_characters, char)
+end
+local path_hash_size = #path_hash_valid_characters
+
+---gets the hashed data folder name for the given path
+---this function should not be used for encryption
+---@param path string the path to find the hashed folder name for
+---@return string hash the name of the data folder
+function getPathHash(path)
+    ---@type integer
+    local reads = 32
+
+    ---@type integer
+    local read_length = math.max(math.floor(#path / reads), 1)
+    local extras = #path - (reads * read_length)
+
+    --convert the path into a string with 24 characters
+    ---@type string
+    local hash = ""
+
+    ---@type integer
+    local read_index = 1
+    while reads > 0 and #path >= read_index do
+        ---@type integer
+        local raw = 0
+
+        ---@type integer
+        local char_reads = read_length
+        if reads <= extras then
+            char_reads = char_reads + 1
+        end
+        while char_reads > 0 do
+            raw = raw + string.byte(path, read_index, read_index)
+            char_reads = char_reads - 1
+            read_index = read_index + 1
+        end
+
+        hash = hash..path_hash_valid_characters[math.fmod(raw, path_hash_size) + 1]
+
+        reads = reads - 1
+    end
+
+    if #path < read_index then
+        hash = hash..string.rep("a", reads)
+    end
+
+    return hash
 end
 
 ---setup the plugin
@@ -273,7 +326,7 @@ local function queryManifest(path, create)
     utils.mkdir(director_path)
 
     ---@type string
-    local data_path = director_path .. "/" .. utils.getPathHash(path)
+    local data_path = director_path .. "/" .. getPathHash(path)
     if (not create) and vim.fn.isdirectory(data_path) ~= 1 then
         return nil
     end
@@ -382,13 +435,13 @@ end
 ---@param group groupName the name of the group
 ---@param config configName the name of the group configuration to save
 local function attemptClean(path, group, config)
-    local data_path = vim.fn.stdpath("data") .. "/director/" .. utils.getPathHash(path)
+    local data_path = vim.fn.stdpath("data") .. "/director/" .. getPathHash(path)
     local manifest_path = data_path .. "/manifest.json"
 
     --check if manifest file exists or is empty
     local manifest = utils.safeJsonDecode(manifest_path)
     if manifest == nil or next(manifest) == nil then
-        utils.rmdir(data_path)
+        utils.rmrf(data_path)
     else
         local path_folder_name = manifest[path]
         if path_folder_name == nil then return end
@@ -416,7 +469,7 @@ local function attemptClean(path, group, config)
             manifest[path] = nil
 
             if next(manifest) == nil then
-                utils.rm(data_path)
+                utils.rmrf(data_path)
             else
                 local manifest_file = io.open(manifest_path, "w")
                 if manifest_file ~= nil then
@@ -996,10 +1049,11 @@ configFieldMenu = function(path, group, config, profile, field)
     elseif desc.type == "option" then
         ---@type string[]
         local options_raw
-        if type(desc.default) == "function" then
-            options_raw = desc.default()
+        if type(desc.options) == "function" then
+            options_raw = desc.options()
         else
-            options_raw = desc.default
+            ---@type string[]
+            options_raw = desc.options ---@diagnostic disable-line:assign-type-mismatch
         end
 
         ---@type Option[]
@@ -1048,6 +1102,7 @@ configFieldMenu = function(path, group, config, profile, field)
         vim.api.nvim_set_option_value("buftype", "acwrite", { buf = p:bufId() })
         vim.api.nvim_set_option_value("signcolumn", "yes", { win = p:winId() })
         vim.api.nvim_set_option_value("winhighlight", "Normal:Normal", { scope = "local", win = p:winId() })
+        vim.api.nvim_buf_set_name(p:bufId(), "temporaryDirectorFileNamealsdkfjaasdfiuasdhfiuhoa")
         p.write_autocmd = vim.api.nvim_create_autocmd({ "BufWriteCmd" }, ---@diagnostic disable-line:inject-field
             {
                 buffer = p:bufId(),
@@ -1227,9 +1282,7 @@ local function configPreview(path, group, config, profile, show_profile)
                     table.insert(out, Line("\t\""..tostring(entry).."\"", { hl_group = "String" }))
                 end
             else
-                if field.type == "option" then
-                    value = "\""..tostring(value[1]).."\""
-                elseif field.type == "string" then
+                if field.type == "string" or field.type == "option" then
                     value = "\""..value.."\""
                 else
                     value = tostring(value)
@@ -1385,8 +1438,12 @@ local function renameProfileMenu(path, group, config, profile)
         width = { min = 20, value = "30%" },
         close_bind = main_config.binds.cancel,
         on_confirm = function (name)
-            config_data[path][group][config].profiles[name] = config_data[path][group][config].profiles[profile]
-            config_data[path][group][config].profiles[profile] = nil
+            local cfg = config_data[path][group][config]
+            cfg.profiles[name] = config_data[path][group][config].profiles[profile]
+            cfg.profiles[profile] = nil
+            if cfg.active == profile then
+                cfg.active = name
+            end
             flagModified(path, group, config)
             p:close()
         end,
@@ -1534,7 +1591,13 @@ function M.configMenu()
                 table.insert(options, {
                     text = config_name,
                     preview = function(_)
-                        return configPreview(path, group_name, config_name, nil, true)
+                        return configPreview(
+                            path,
+                            group_name,
+                            config_name,
+                            config_data[path][group_name][config_name].active,
+                            true
+                        )
                     end,
                     path = path,
                     group = group_name,
@@ -1578,7 +1641,15 @@ function M.configMenu()
     end
 end
 
---todo:
---  - use oneup line and text classes to make config menus more pretty
+--TODO INCOMPLETE:
+-- finish cmake submodule test configuration/actions
+--
+--TODO BUGS:
+--
+--TODO NEW FEATURES:
+-- list config elements should be enclosed in brackets in preview menu
+-- add ability to have prompt text for each action config field
+-- change name of submodules folder ("action_groups")
+-- write submodules into folders with readmes thereby allowing for easier configurations
 
 return M

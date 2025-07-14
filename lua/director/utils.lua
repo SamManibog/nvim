@@ -8,7 +8,7 @@ function M.isValidName(name)
 end
 
 ---decodes a json file, outputting a table representing the file
----if the file contains invalid json, returns nil
+---if the file cannot be opened or contains invalid json, returns nil
 ---@param path string the path of the json file
 ---@return any
 function M.safeJsonDecode(path)
@@ -28,7 +28,7 @@ function M.safeJsonDecode(path)
     end
 end
 
----Run a command in the terminal emulator
+---Open neovim's terminal emulator in a new tab and run a command
 ---@param cmd string the commmand + any arguments
 function M.runInTerminal(cmd)
     vim.cmd("tabnew")
@@ -36,85 +36,42 @@ function M.runInTerminal(cmd)
     pcall(vim.cmd, "startinsert")
 end
 
----gets the default profile for a given configuration
+---gets the default profile for a configuration given a list of fields
 ---@param fields ConfigField[]
 ---@return table
 function M.getDefaultProfile(fields)
     local out = {}
     for _, field in ipairs(fields) do
-        local value
         if type(field.default) == "function" then
-            value = field.default()
+            out[field.name] = field.default()
         else
-            value = field.default
-        end
-
-        if field.type == "option" then
-            out[field.name] = value[1]
-        else
-            out[field.name] = value
+            out[field.name] = field.default
         end
     end
     return out
 end
 
----@type string[]
-local path_hash_valid_characters = {}
-for char in string.gmatch("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789", ".") do
-    table.insert(path_hash_valid_characters, char)
-end
-local path_hash_size = #path_hash_valid_characters
-
----gets the hashed data folder name for the given path
----this function should not be used for encryption
----@param path string the path to find the hashed folder name for
----@return string hash the name of the data folder
-function M.getPathHash(path)
-    ---@type integer
-    local reads = 32
-
-    ---@type integer
-    local read_length = math.max(math.floor(#path / reads), 1)
-    local extras = #path - (reads * read_length)
-
-    --convert the path into a string with 24 characters
-    ---@type string
-    local hash = ""
-
-    ---@type integer
-    local read_index = 1
-    while reads > 0 and #path >= read_index do
-        ---@type integer
-        local raw = 0
-
-        ---@type integer
-        local char_reads = read_length
-        if reads <= extras then
-            char_reads = char_reads + 1
-        end
-        while char_reads > 0 do
-            raw = raw + string.byte(path, read_index, read_index)
-            char_reads = char_reads - 1
-            read_index = read_index + 1
-        end
-
-        hash = hash..path_hash_valid_characters[math.fmod(raw, path_hash_size) + 1]
-
-        reads = reads - 1
-    end
-
-    if #path < read_index then
-        hash = hash..string.rep("a", reads)
-    end
-
-    return hash
-end
-
----removes a directory at a given path recursively
----@param path string the path at which to make the directory (no parents created)
-function M.rm(path)
+---recursively and forcibly removes whatever is found at the given path
+---@param path string the path to remove
+function M.rmrf(path)
     if vim.uv.fs_stat(path) ~= nil then
         vim.fn.delete(path, "rf")
+    end
+end
+
+---removes the file at the given path
+---@param path string the path of the file to remove
+function M.rm(path)
+    if vim.uv.fs_stat(path) ~= nil then
+        vim.fn.delete(path, "")
+    end
+end
+
+---removes the directory at the given path if it is empty
+---@param path string the path of the file to remove
+function M.rmdir(path)
+    if vim.uv.fs_stat(path) ~= nil then
+        vim.fn.delete(path, "d")
     end
 end
 
@@ -126,14 +83,77 @@ function M.mkdir(path)
     end
 end
 
----detects if the current working directory belongs to a cmake buildsystem
-function M.detectCmake()
-    return vim.fn.filereadable(vim.fn.getcwd().."/CMakeLists.txt") == 1
-end
+---gets a list of all files or directories that satisfy the given function, searching recursively from the given path
+---@param path string the path from which to start the search
+---@param detect fun(path: string): boolean the function used to detect if a path should be listed
+---@param whitelist? fun(path: string): boolean the function used to detect if a given directory should be included in the search
+---@param depth? integer the maximum depth to search for files a depth of 0 means only the given path will be searched
+---@param count? integer the maximum number of entries to return
+function M.listFiles(path, detect, whitelist, depth, count)
+    if count == nil then count = math.huge end
+    if depth == nil then depth = math.huge end
+    if whitelist == nil then whitelist = function(_) return true end end
+    if path:sub(-1):match("[/\\]") then path = path:sub(0, -2) end
 
----detects if the current working directory belongs to a cargo buildsystem
-function M.detectCargo()
-    return vim.fn.filereadable(vim.fn.getcwd().. "/Cargo.toml") == 1
+    ---@type string[]
+    local queue1 = {}
+
+    ---@type string[]
+    local queue2 = {}
+
+    ---@type string[]
+    local out = {}
+
+    ---@type integer
+    local out_size = 0
+
+    ---@type integer
+    local search_depth = 1
+
+    if depth >= 0 and count > 0 then
+        local fs = vim.uv.fs_scandir(path)
+
+        for name, type in function() return vim.uv.fs_scandir_next(fs) end do
+            local full_path = path.."/"..name
+            if type == "directory" and whitelist(full_path) then
+                table.insert(queue1, "/"..name)
+            end
+            if detect(full_path) then
+                table.insert(out, "/"..name)
+                out_size = out_size + 1
+                if out_size >= count then return out end
+            end
+        end
+    else
+        return out
+    end
+
+    while #queue1 > 0 and search_depth <= depth do
+        while #queue1 > 0 do
+            local rel_path = queue1[#queue1]
+            local fs = vim.uv.fs_scandir(path..rel_path)
+            queue1[#queue1] = nil
+
+            for name, type in function() return vim.uv.fs_scandir_next(fs) end do
+                local full_path = path..rel_path.."/"..name
+                if type == "directory" and whitelist(full_path) then
+                    table.insert(queue2, rel_path.."/"..name)
+                end
+                if detect(full_path) then
+                    table.insert(out, rel_path.."/"..name)
+                    out_size = out_size + 1
+                    if out_size >= count then return out end
+                end
+            end
+        end
+
+        search_depth = search_depth + 1
+
+        queue1 = queue2
+        queue2 = {}
+    end
+
+    return out
 end
 
 return M
