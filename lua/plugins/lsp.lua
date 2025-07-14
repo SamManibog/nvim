@@ -1,29 +1,13 @@
 return {
     "neovim/nvim-lspconfig",
     dependencies = {
+        "folke/lazydev.nvim",
         "williamboman/mason.nvim",
         "williamboman/mason-lspconfig.nvim",
-        "hrsh7th/cmp-nvim-lsp",
-        "hrsh7th/cmp-buffer",
-        "hrsh7th/cmp-path",
-        "hrsh7th/cmp-cmdline",
-        "hrsh7th/nvim-cmp",
-        "L3MON4D3/LuaSnip",
-        "saadparwaiz1/cmp_luasnip",
     },
     lazy = false,
     config = function()
-        require('cmp')
-        local cmp_lsp = require("cmp_nvim_lsp")
-        local capabilities = vim.tbl_deep_extend(
-            "force",
-            {},
-            vim.lsp.protocol.make_client_capabilities(),
-            cmp_lsp.default_capabilities()
-        )
-
         vim.lsp.config("lua_ls", {
-            capabilities = capabilities,
             filetypes = { "lua" },
             settings = {
                 Lua = {
@@ -35,12 +19,9 @@ return {
             }
         })
 
-        vim.lsp.config("rust_analyzer", {
-            capabilities = capabilities,
-        })
+        vim.lsp.config("rust_analyzer", {})
 
         vim.lsp.config("clangd", {
-            capabilities = capabilities,
             cmd = {
                 "clangd",
                 "--query-driver=**",
@@ -60,7 +41,6 @@ return {
         })
 
         vim.lsp.config("omnisharp", {
-            capabilities = capabilities,
             cmd = {
                 "dotnet",
                 vim.fn.stdpath("data") .. "/mason/packages/omnisharp/libexec/OmniSharp.dll"
@@ -68,16 +48,22 @@ return {
             enable_import_completion = true,
             organize_imports_on_format = true,
             enable_roslyn_analyzers = true,
-            root_dir = function ()
+            root_dir = function()
                 return vim.loop.cwd() -- current working directory
             end,
         })
 
-        vim.lsp.config("wgsl_analyzer", {
-            capabilities = capabilities,
-        })
+        vim.lsp.config("wgsl_analyzer", {})
 
-        require("mason").setup()
+        require("mason").setup({
+            ui = {
+                icons = {
+                    package_installed = "✓",
+                    package_pending = "➜",
+                    package_uninstalled = "✗"
+                }
+            }
+        })
         require("mason-lspconfig").setup()
     end
 }
