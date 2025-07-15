@@ -319,6 +319,13 @@ return {
                 local buftype = vim.api.nvim_get_option_value("buftype", { buf = buf })
                 local filetype = vim.api.nvim_get_option_value("filetype", { buf = buf })
 
+                local bufname_out
+                if bufname:sub(-1):match("[/\\]") == nil then
+                    bufname_out =  " "..vim.fn.fnamemodify(bufname, ":t").." "
+                else
+                    bufname_out =  " "..vim.fn.fnamemodify(bufname:sub(1, -2), ":t").."/ "
+                end
+
                 print("bufname: "..bufname)
                 print("buftype: "..buftype)
                 print("filetype: "..filetype)
@@ -327,19 +334,19 @@ return {
                     return " [Terminal] "
                 end
 
-                if filetype == "netrw" then
-                    return " netrw "
-                end
-
-                if bufname == "" then
+                if buftype ~= "" or bufname == "" then
                     if filetype == "" then
-                        return " [No Name] "
+                        if bufname == "" then
+                            return " [No Name] "
+                        else
+                            return bufname_out
+                        end
                     else
                         return " "..filetype.." "
                     end
                 end
 
-                return " "..vim.fn.fnamemodify(bufname, ":t").." "
+                return bufname_out
             end,
             hl = function(self)
                 if not self.is_active then
