@@ -1099,10 +1099,11 @@ configFieldMenu = function(path, group, config, profile, field)
                 configProfileEditor(path, group, config, profile)
             end
         }, true)
+
         vim.api.nvim_set_option_value("buftype", "acwrite", { buf = p:bufId() })
         vim.api.nvim_set_option_value("signcolumn", "yes", { win = p:winId() })
         vim.api.nvim_set_option_value("winhighlight", "Normal:Normal", { scope = "local", win = p:winId() })
-        vim.api.nvim_buf_set_name(p:bufId(), "temporaryDirectorFileNamealsdkfjaasdfiuasdhfiuhoa")
+        vim.api.nvim_buf_set_name(p:bufId(), "director_list_edit"..profile.."_".."field")
         p.write_autocmd = vim.api.nvim_create_autocmd({ "BufWriteCmd" }, ---@diagnostic disable-line:inject-field
             {
                 buffer = p:bufId(),

@@ -40,7 +40,7 @@ return {
                 git_change = utils.get_highlight("diffChanged").fg,
             }
         end
-        require("heirline").load_colors(setup_colors)
+        require("heirline").load_colors(setup_colors())
 
         vim.api.nvim_create_augroup("Heirline", { clear = true })
         vim.api.nvim_create_autocmd("ColorScheme", {
@@ -54,11 +54,8 @@ return {
         local Space = { provider = " " }
 
         local ViMode = {
-            init = function(self)
-                self.mode = vim.fn.mode(1) -- :h mode()
-            end,
             static = {
-                mode_names = { -- change the strings if you like it vvvvverbose!
+                mode_names = {
                     ["n"] = "Normal",
                     ["no"] = "Normal",
                     ["nov"] = "Normal",
@@ -73,52 +70,36 @@ return {
                     ["vs"] = "Visual",
                     ["V"] = "V-Line",
                     ["Vs"] = "V-Line",
-                    ["\22"] = "V-Block",
-                    ["\22s"] = "V-Block",
+                    ["\22"] = "V-Blck",
+                    ["\22s"] = "V-Blck",
                     ["s"] = "Select",
                     ["S"] = "S-Line",
-                    ["\19"] = "S-Block",
+                    ["\19"] = "S-Blck",
                     ["i"] = "Insert",
                     ["ic"] = "Insert",
                     ["ix"] = "Insert",
-                    ["R"] = "Replace",
-                    ["Rc"] = "Replace",
-                    ["Rx"] = "Replace",
-                    ["Rv"] = "V-Replace",
-                    ["Rvc"] = "V-Replace",
-                    ["Rvx"] = "V-Replace",
-                    ["c"] = "Command",
-                    ["cv"] = "Ex",
-                    ["ce"] = "Ex",
-                    ["r"] = "Replace",
-                    ["rm"] = "More",
-                    ["r?"] = "Confirm",
-                    ["!"] = "Shell",
-                    ["t"] = "Terminal",
+                    ["R"] = "Replce",
+                    ["Rc"] = "Replce",
+                    ["Rx"] = "Replce",
+                    ["Rv"] = "V-Rplc",
+                    ["Rvc"] = "V-Rplc",
+                    ["Rvx"] = "V-Rplc",
+                    ["c"] = "Commnd",
+                    ["cv"] = "Ex    ",
+                    ["ce"] = "Ex    ",
+                    ["r"] = "Replce",
+                    ["rm"] = "More  ",
+                    ["r?"] = "Confrm",
+                    ["!"] = "Shell ",
+                    ["t"] = "Termnl",
                 },
-                mode_colors = {
-                    n = "bright_white",
-                    i = "bright_green",
-                    v = "bright_magenta",
-                    V =  "bright_magenta",
-                    ["\22"] =  "bright_cyan",
-                    c =  "bright_red",
-                    s =  "blue",
-                    S =  "blue",
-                    ["\19"] =  "bright_blue",
-                    R =  "yellow",
-                    r =  "yellow",
-                    ["!"] =  "bright_red",
-                    t =  "bright_red",
-                }
             },
             provider = function(self)
-                return "%2("..self.mode_names[self.mode].."%)"
+                return "%2("..self.mode_names[self.mode()].."%)"
             end,
             -- Same goes for the highlight. Now the foreground will change according to the current mode.
             hl = function(self)
-                local mode = self.mode:sub(1, 1) -- get only the first mode character
-                return { fg = self.mode_colors[mode], bold = true, }
+                return { fg = "bg_2", bg = self:mode_color(), bold = true, }
             end,
             update = {
                 "ModeChanged",
@@ -128,19 +109,17 @@ return {
                 end),
             },
         }
-        ViMode = utils.surround({"█", "█"}, "bg_2", ViMode)
+        ViMode = utils.surround({"█", "█"}, function(self) return self:mode_color() end, ViMode)
 
         local FileNameBlock = {
-            -- let's first set up some attributes needed by this component and its children
             init = function(self)
-                if vim.fn.mode(1) == "t" then
-                    self.filename = "cmd.exe"
+                if vim.bo.buftype == "terminal" then
+                    self.filename = "[No Name]"
                 else
                     self.filename = vim.api.nvim_buf_get_name(0)
                 end
             end,
         }
-        -- We can now define some children separately and add them later
 
         local FileIcon = {
             init = function(self)
@@ -160,13 +139,8 @@ return {
 
         local FileName = {
             provider = function(self)
-                -- first, trim the pattern relative to the current directory. For other
-                -- options, see :h filename-modifers
                 local filename = vim.fn.fnamemodify(self.filename, ":.")
                 if filename == "" then return "[No Name]" end
-                -- now, if the filename would occupy more than 1/4th of the available
-                -- space, we trim the file path to its initials
-                -- See Flexible Components section below for dynamic truncation
                 if not conditions.width_percent_below(#filename, 0.25) then
                     filename = vim.fn.pathshorten(filename)
                 end
@@ -181,11 +155,6 @@ return {
             hl = { fg = "bright_blue" },
         }
 
-        -- Now, let's say that we want the filename color to change if the buffer is
-        -- modified. Of course, we could do that directly using the FileName.hl field,
-        -- but we'll see how easy it is to alter existing components using a "modifier"
-        -- component
-
         local FileNameModifer = {
             hl = function()
                 if vim.bo.modified then
@@ -195,14 +164,11 @@ return {
             end,
         }
 
-        -- let's add the children to our FileNameBlock component
         FileNameBlock = utils.insert(FileNameBlock,
             utils.insert(FileNameModifer, FileName), -- a new table where FileName is a child of FileNameModifier
             FileIcon,
             { provider = '%<'} -- this means that the statusline is cut here when there's not enough space
         )
-
-        -- FileNameBlock = utils.surround({"█", "█"}, "bg_3", FileNameBlock)
 
         local FileType = {
             condition = function()
@@ -253,12 +219,12 @@ return {
                 end,
                 hl = { fg = "diag_warn" },
             },
-            --[[{
+            {
                 provider = function(self)
                     return (self.info_icon .. self.info .. " ")
                 end,
                 hl = { fg = "diag_info" },
-            },]]
+            },
             {
                 provider = function(self)
                     return (self.hint_icon .. self.hints)
@@ -269,9 +235,6 @@ return {
 
         local LSPActive = {
             update = {'LspAttach', 'LspDetach'},
-
-            -- You can keep it simple,
-            -- provider = " [LSP]",
 
             -- Or complicate things a bit and get the servers names
             provider = function()
@@ -301,29 +264,95 @@ return {
             end
         }
 
-        Ruler = utils.surround({"█", "█"}, "fg_1", Ruler)
+        Ruler = utils.surround({"█", "█"}, function(self) return self:mode_color() end, Ruler)
 
-        local MainRight = {
-            --utils.surround({"",""}, "bg_2", ViMode),
+        local MainLeft = {
             ViMode,
             Space,
             FileNameBlock,
         }
 
-        local MainLeft = {
+        local MainRight = {
             BufferInfo,
             utils.surround({"",""}, "bg_2", Ruler)
         }
 
         local DefaultStatusLine = {
             hl = { bg = "bg_1" },
-            MainRight, Space,
+            MainLeft, Space,
             Align,
-            LSPStatus, Space, MainLeft
+            LSPStatus, Space, MainRight,
+            static = {
+                mode_color_map = {
+                    n = "bright_white",
+                    i = "bright_green",
+                    v = "bright_magenta",
+                    V =  "bright_magenta",
+                    ["\22"] =  "bright_cyan",
+                    c =  "bright_red",
+                    s =  "blue",
+                    S =  "blue",
+                    ["\19"] =  "bright_blue",
+                    R =  "yellow",
+                    r =  "yellow",
+                    ["!"] =  "bright_red",
+                    t =  "bright_red",
+                },
+                mode = function()
+                    local mode = conditions.is_active() and vim.fn.mode() or "n"
+                    mode = mode:sub(1, 1)
+                    return mode
+                end,
+                mode_color = function(self)
+                    return self.mode_color_map[self.mode()]
+                end
+            }
+        }
+
+        local Tabpage = {
+            provider = function(self)
+                local buf = vim.api.nvim_win_get_buf(
+                    vim.api.nvim_tabpage_get_win(self.tabpage)
+                )
+
+                local bufname = vim.api.nvim_buf_get_name(buf)
+                local buftype = vim.api.nvim_get_option_value("buftype", { buf = buf })
+                local filetype = vim.api.nvim_get_option_value("filetype", { buf = buf })
+
+                print("bufname: "..bufname)
+                print("buftype: "..buftype)
+                print("filetype: "..filetype)
+
+                if buftype == "terminal" then
+                    return " [Terminal] "
+                end
+
+                if filetype == "netrw" then
+                    return " netrw "
+                end
+
+                if bufname == "" then
+                    if filetype == "" then
+                        return " [No Name] "
+                    else
+                        return " "..filetype.." "
+                    end
+                end
+
+                return " "..vim.fn.fnamemodify(bufname, ":t").." "
+            end,
+            hl = function(self)
+                if not self.is_active then
+                    return "TabLine"
+                else
+                    return "TabLineSel"
+                end
+            end,
         }
 
         require("heirline").setup({
-            statusline = DefaultStatusLine
+            statusline = DefaultStatusLine,
+            tabline = utils.make_tablist(Tabpage),
         })
     end
 }
