@@ -21,6 +21,14 @@ local utils = require("director.utils")
 ---@field default any           the default value (or function provider) for the field. type should match self.type. if type is option, default instead provides the options used where the first option provided is the true default value
 ---@field validate (fun(any): boolean)?   a function used to validate the field
 ---@field options nil|string[]|(fun():string[]) a function used to provide option values when type is set to "option"
+---@field cmd_omit boolean?                 used in utils.generateCommand
+---@field omit_default boolean?             used in utils.generateCommand
+---@field arg_prefix string?                used in utils.generateCommand
+---@field arg_postfix string?               used in utils.generateCommand
+---@field list_affix boolean?               used in utils.generateCommand
+---@field show_empty boolean?               used in utils.generateCommand
+---@field bool_display boolean?             used in utils.generateCommand
+---@field custom_cmd (fun(any): string)?    used in utils.generateCommand
 
 ---@class DirectorBindsConfig
 ---@field up string[]           a list of binds used to move cursor upwards in the menus
@@ -441,7 +449,7 @@ local function attemptClean(path, group, config)
     --check if manifest file exists or is empty
     local manifest = utils.safeJsonDecode(manifest_path)
     if manifest == nil or next(manifest) == nil then
-        utils.rmrf(data_path)
+        vim.fn.delete(data_path, "rf")
     else
         local path_folder_name = manifest[path]
         if path_folder_name == nil then return end
@@ -457,7 +465,7 @@ local function attemptClean(path, group, config)
             or config_json.profiles == nil
             or next(config_json.profiles) == nil
         then
-            utils.rm(config_path)
+            vim.fn.delete(config_path)
         end
 
         --delete group,path folder if it is empty
@@ -469,7 +477,7 @@ local function attemptClean(path, group, config)
             manifest[path] = nil
 
             if next(manifest) == nil then
-                utils.rmrf(data_path)
+                vim.fn.delete(data_path, "rf")
             else
                 local manifest_file = io.open(manifest_path, "w")
                 if manifest_file ~= nil then

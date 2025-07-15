@@ -326,10 +326,6 @@ return {
                     bufname_out =  " "..vim.fn.fnamemodify(bufname:sub(1, -2), ":t").."/ "
                 end
 
-                print("bufname: "..bufname)
-                print("buftype: "..buftype)
-                print("filetype: "..filetype)
-
                 if buftype == "terminal" then
                     return " [Terminal] "
                 end

@@ -22,6 +22,13 @@ end)
 --quick toggle (s)hell
 local dir_utils = require("director.utils")
 vim.keymap.set({"n", "t"}, "<C-s>", dir_utils.toggleTerminal)
+vim.keymap.set({"n"}, "<leader><C-s>", function()
+    dir_utils.openTerminal()
+    local win = vim.api.nvim_get_current_win()
+    vim.cmd("tab split")
+    vim.api.nvim_win_close(win, true)
+end)
+vim.keymap.set({"n", "t"}, "<leader><leader><C-s>", dir_utils.forceKillTerminal)
 
 --tab navigation
 vim.keymap.set("n", "<leader>t", [[<cmd>tab split<CR>]])

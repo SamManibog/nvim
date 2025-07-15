@@ -28,6 +28,89 @@ function M.safeJsonDecode(path)
     end
 end
 
+---generates a command using a table given list of config fields to be used as keys
+---important fields in the configField type are
+--- - cmd_omit      if this is true, the field will not be used in command generation
+--- - omit_default  if the table value is the default value in the config field, writing the argument is skipped
+--- - arg_prefix    used to prefix the value found in the config
+--- - arg_postfix   used to post the value found in the config
+--- - list_affix    if true and the type is a list, arg_prefix and arg_postfix will be used between every element on the list (default is surrounding the entire list)
+--- - show_empty    if true and the type is a list, option, or string, pre and postfix will be appended to the command even if the string value is empty.
+--- - bool_display  if the type is a boolean and this is not nil, instead of the normal format, [prefix][postfix] will be appended to the command if bool_display matches the config's value
+---@param head string the main command
+---@param config table the table containing keys specified by fields
+---@param fields ConfigField[] a list of fields used as the specification for generating a command
+---@return string command a command in the format [head] [arg1_prefix][arg1][arg1_postfix] [arg2_prefix][arg2][arg2_postfix]...
+function M.generateCommand(head, config, fields)
+    local cmd = head
+    for _, field in ipairs(fields) do
+        ---@type boolean
+        local generate = not field.cmd_omit
+        if field.omit_default and generate then
+            local default
+            if type(field.default) == "function" then
+                default = field.default()
+            else
+                default = field.default
+            end
+
+            if field.type == "list" then
+                if #default == #config[field.name] then
+                    generate = false
+                else
+                    for idx, value in ipairs(default) do
+                        if value ~= default.value[idx] then
+                            generate = true
+                            break
+                        end
+                    end
+                    generate = false
+                end
+            else
+                generate = default ~= config[field.name]
+            end
+        else
+            generate = true
+        end
+
+        local value = config[field.name]
+
+        if (not field.show_empty)
+            and (field.type == "string" or field.type == "list" or field.type == "option")
+            and #value <= 0
+        then
+            generate = false
+        end
+
+        if generate then
+            local pre = field.arg_prefix or " "
+            local post = field.arg_postfix or ""
+
+            if field.custom_cmd ~= nil then
+                cmd = cmd.." "..pre..field.custom_cmd(value)..post
+            elseif field.type == "list" and field.list_affix then
+                for _, entry in ipairs(value) do
+                    cmd = cmd.." "..pre..entry..post
+                end
+            elseif field.type == "list" then
+                cmd = cmd.." "..pre
+                for _, entry in ipairs(value) do
+                    cmd = cmd.." "..entry
+                end
+                cmd = cmd..post
+            elseif field.type == "boolean" and field.bool_display ~= nil then
+                if value == field.bool_display then
+                    cmd = cmd.." "..pre..post
+                end
+            else
+                cmd = cmd.." "..pre..tostring(value)..post
+            end
+        end
+    end
+
+    return cmd
+end
+
 ---@type number?
 local term_job
 
@@ -37,6 +120,14 @@ local term_job_buffer
 ---@return boolean
 function M.terminalIsOpen()
     return term_job ~= nil and term_job_buffer ~= nil
+end
+
+function M.forceKillTerminal()
+    if term_job ~= nil then
+        vim.fn.jobstop(term_job)
+    end
+    term_job = nil
+    term_job_buffer = nil
 end
 
 ---@return boolean new_created returns true if a new terminal buffer was created and false otherwise
@@ -69,7 +160,7 @@ function M.openTerminal()
             group = vim.api.nvim_create_augroup("director-terminal", { clear = true}),
             buffer = term_job,
             callback = function()
-                print("terminal killed")
+                print("term killed")
                 term_job = nil
                 term_job_buffer = nil
             end
@@ -114,31 +205,8 @@ function M.getDefaultProfile(fields)
     return out
 end
 
----recursively and forcibly removes whatever is found at the given path
----@param path string the path to remove
-function M.rmrf(path)
-    if vim.uv.fs_stat(path) ~= nil then
-        vim.fn.delete(path, "rf")
-    end
-end
-
----removes the file at the given path
----@param path string the path of the file to remove
-function M.rm(path)
-    if vim.uv.fs_stat(path) ~= nil then
-        vim.fn.delete(path, "")
-    end
-end
-
----removes the directory at the given path if it is empty
----@param path string the path of the file to remove
-function M.rmdir(path)
-    if vim.uv.fs_stat(path) ~= nil then
-        vim.fn.delete(path, "d")
-    end
-end
-
 ---creates a directory at the given path if it doesn't already exist
+---(convenient as vim function throws an error if directory exists)
 ---@param path string the path at which to make the directory (no parents created)
 function M.mkdir(path)
     if vim.fn.isdirectory(path) ~= 1 then
