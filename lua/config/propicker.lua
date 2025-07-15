@@ -1,110 +1,20 @@
 local M = {}
 
 local PromptPopup = require("oneup.prompt_popup")
-local utils = require("config.utils")
 
---[===[
---todo
---add ability to create new project/new project menu
-    --add projects folder picker to specify which folder to use
-    --add template picker to chose a template
-    --add menu to enter opts, using either popup.new_input or popup.new_adv_input
-
------------------------------------------------------------------------------------
----Frontend
------------------------------------------------------------------------------------
----@type {[string]: {
----     opts: {[string]: (fun(text:string):boolean)?},
----     template: fun(table):DirEntry}}
-M.templates = {
-    cmake = {--the name of the template
-        opts = {--a table of options that the user will be prompted to fill out
-            --prompt = verify_input_callback (or nil)
-        },
-        --spec = dirspec_generator_callback
-    }
-}
-
------------------------------------------------------------------------------------
----Backend
------------------------------------------------------------------------------------
-
----@class DirEntry a representation of some sub directory
----@field name string the name of the file including possible extensions (but not the path)
----@field text (string | fun(opts: table):string)? text contents (files only)
----@field entries (DirEntry[] | fun(opts: table):DirEntry[])? entry contents (folders only)
-
----creates the given directory an all of its contents as a child of the given path
----@param dir_entry DirEntry the directory entry to use as a template
----@param path string the path at which to create the directory
----@param opts table? a table of options to be called by contents functions
-function M.load_template(dir_entry, path, opts)
-    if dir_entry.name == nil then
-        print("invalid template, entries must have name field")
-    end
-    if
-        (dir_entry.text == nil and dir_entry.entries == nil)
-        or (dir_entry.text ~= nil and dir_entry.entries ~= nil)
-    then
-        print("invalid template, entries must have EITHER a text OR entries field")
+local function trim(s)
+    local l = 1
+    while string.sub(s, l, l) == ' ' do
+        l = l+1
     end
 
-    if opts == nil then
-        opts = {}
+    local r = string.len(s)
+    while string.sub(s, r, r) == ' ' do
+        r = r-1
     end
-    if utils.isDirectory(path) then
-        if type(dir_entry.entries) ~= "nil" then
-            ---@type DirEntry[]
-            local entries
-            if type(dir_entry.entries) == "function" then
-                entries = dir_entry.entries(opts)
-            else
-                entries = dir_entry.entries --[[@as DirEntry[] ]]
-            end
 
-            local dir_name = path.."/"..dir_entry.name
-
-            if utils.isDirectoryEntry(dir_name) then
-                error("file "..dir_name.." already exists")
-            end
-
-            vim.uv.fs_mkdir(dir_name, tonumber("777", 8))
-
-            ---@type _, DirEntry
-            for _, entry in pairs(entries) do
-                M.load_template(entry, dir_name, opts)
-            end
-        else
-            ---@type string
-            local text
-            if type(dir_entry.text) == "function" then
-                text = dir_entry.text(opts)
-            else
-                text = dir_entry.text --[[@as string]]
-            end
-
-            local file_name = path.."/"..dir_entry.name
-
-            if utils.isDirectoryEntry(file_name) then
-                error("file "..file_name.." already exists")
-            end
-
-            local file = io.open(file_name, "w")
-            if file ~= nil then
-                file:write(text)
-                file:close()
-            else
-                error("unable to create file "..file_name)
-            end
-        end
-    else
-        error(path.." is not a valid directory")
-    end
+    return string.sub(s, l, r)
 end
-
-function M.new_project()
-end
-]===]
 
 --open the project menu
 function M.project_menu()
@@ -128,9 +38,9 @@ function M.project_menu()
     --handle groups
     if projFolderGroupsRaw ~= nil then
         for path in (projFolderGroupsRaw .. ";"):gmatch("([^;]*);") do
-            local tpath = utils.trim(path)
+            local tpath = trim(path)
 
-            if utils.isDirectory(tpath) then
+            if vim.fn.isdirectory(tpath) == 1 then
                 local iter = vim.uv.fs_scandir(tpath)
                 local name, type = vim.uv.fs_scandir_next(iter)
                 while name ~= nil do
@@ -152,9 +62,9 @@ function M.project_menu()
     --handle individual projects
     if projFoldersRaw ~= nil then
         for path in (projFoldersRaw .. ";"):gmatch("([^;]*);") do
-            local tpath = utils.trim(path)
+            local tpath = trim(path)
 
-            if utils.isDirectory(tpath) then
+            if vim.fn.isdirectory(tpath) == 1 then
                 local project = {}
                 projectCount = projectCount + 1
                 project.name = vim.fn.fnamemodify(path, ":t")

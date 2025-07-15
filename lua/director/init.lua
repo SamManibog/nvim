@@ -126,7 +126,7 @@ local path_hash_size = #path_hash_valid_characters
 ---this function should not be used for encryption
 ---@param path string the path to find the hashed folder name for
 ---@return string hash the name of the data folder
-function getPathHash(path)
+local function getPathHash(path)
     ---@type integer
     local reads = 32
 
@@ -735,7 +735,7 @@ end
 ---@param title string the title to display for the menu
 ---@param actions { [groupName]: ActionDataContainer }
 ---@param file_path string the file on which to call file-local actions
-function openActionsMenu(title, actions, file_path)
+local function openActionsMenu(title, actions, file_path)
     ---@type Option[]
     local options = {}
     local longest_bind = 0

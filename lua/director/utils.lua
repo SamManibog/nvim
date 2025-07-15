@@ -28,12 +28,66 @@ function M.safeJsonDecode(path)
     end
 end
 
----Open neovim's terminal emulator in a new tab and run a command
----@param cmd string the commmand + any arguments
+---@type number?
+local term_job
+
+---@type number?
+local term_job_buffer
+
+---@return boolean
+function M.terminalIsOpen()
+    return term_job ~= nil and term_job_buffer ~= nil
+end
+
+---@return boolean new_created returns true if a new terminal buffer was created and false otherwise
+function M.openTerminal()
+    if M.terminalIsOpen() then
+        if vim.fn.bufnr ~= term_job_buffer then
+            vim.cmd.vnew()
+            vim.cmd.buffer(term_job_buffer)
+            vim.cmd.wincmd("J")
+        end
+        if vim.fn.mode() ~= "t" then
+            vim.cmd.startinsert()
+        end
+        return false
+    else
+        vim.cmd.vnew()
+        vim.cmd.terminal()
+        term_job = vim.bo.channel
+        term_job_buffer = vim.fn.bufnr("%")
+        vim.api.nvim_create_autocmd("BufWipeout", {
+            group = vim.api.nvim_create_augroup("director-terminal", { clear = true}),
+            buffer = term_job,
+            callback = function()
+                print("terminal killed")
+                term_job = nil
+                term_job_buffer = nil
+            end
+        })
+        vim.cmd.wincmd("J")
+        vim.cmd.startinsert()
+        return true
+    end
+end
+
+---@param cmd string the command to run in the terminal
 function M.runInTerminal(cmd)
-    vim.cmd("tabnew")
-    pcall(vim.cmd, "terminal " .. cmd)
-    pcall(vim.cmd, "startinsert")
+    if not M.openTerminal() then
+        vim.fn.chansend(term_job, "\3") ---@diagnostic disable-line:param-type-mismatch openTerminal function guarantees term_job is non-nil
+    end
+
+    vim.fn.chansend(term_job, { cmd, "" }) ---@diagnostic disable-line:param-type-mismatch
+end
+
+---closes the terminal if currently on the terminal
+---opens the terminal if not on the terminal
+function M.toggleTerminal()
+    if vim.fn.bufnr() == term_job_buffer then
+        vim.cmd.quit()
+    else
+        M.openTerminal()
+    end
 end
 
 ---gets the default profile for a configuration given a list of fields
@@ -113,6 +167,8 @@ function M.listFiles(path, detect, whitelist, depth, count)
     if depth >= 0 and count > 0 then
         local fs = vim.uv.fs_scandir(path)
 
+        if fs == nil then error("'"..path.."' is not a directory.") end
+
         for name, type in function() return vim.uv.fs_scandir_next(fs) end do
             local full_path = path.."/"..name
             if type == "directory" and whitelist(full_path) then
@@ -133,6 +189,8 @@ function M.listFiles(path, detect, whitelist, depth, count)
             local rel_path = queue1[#queue1]
             local fs = vim.uv.fs_scandir(path..rel_path)
             queue1[#queue1] = nil
+
+            if fs == nil then error("'"..path.."' is not a directory.") end
 
             for name, type in function() return vim.uv.fs_scandir_next(fs) end do
                 local full_path = path..rel_path.."/"..name
