@@ -43,6 +43,15 @@ end
 function M.openTerminal()
     if M.terminalIsOpen() then
         if vim.fn.bufnr ~= term_job_buffer then
+            local wins = vim.api.nvim_tabpage_list_wins(0)
+            for _, win_id in ipairs(wins) do
+                if vim.api.nvim_win_get_buf(win_id) == term_job_buffer then
+                    vim.api.nvim_tabpage_set_win(0, win_id)
+                    vim.cmd.wincmd("J")
+                    vim.cmd.startinsert()
+                    return false
+                end
+            end
             vim.cmd.vnew()
             vim.cmd.buffer(term_job_buffer)
             vim.cmd.wincmd("J")
