@@ -1,12 +1,5 @@
 local M = {}
 
----determines if a string is a valid name for a config descriptor, group name, or group field name
----@param name string the string to check if it is a valid name
----@return boolean is_valid whether or not name is valid
-function M.isValidName(name)
-    return #name >= 1 and #name <= 24 and name:match("[^%w_ ]") == nil
-end
-
 ---decodes a json file, outputting a table representing the file
 ---if the file cannot be opened or contains invalid json, returns nil
 ---@param path string the path of the json file
@@ -188,21 +181,6 @@ function M.toggleTerminal()
     else
         M.openTerminal()
     end
-end
-
----gets the default profile for a configuration given a list of fields
----@param fields ConfigField[]
----@return table
-function M.getDefaultProfile(fields)
-    local out = {}
-    for _, field in ipairs(fields) do
-        if type(field.default) == "function" then
-            out[field.name] = field.default()
-        else
-            out[field.name] = field.default
-        end
-    end
-    return out
 end
 
 ---creates a directory at the given path if it doesn't already exist

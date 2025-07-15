@@ -7,6 +7,16 @@ return {
     config = function()
         local conditions = require("heirline.conditions")
         local utils = require("heirline.utils")
+
+        ---@param colors string[][]
+        local function color_fallback(colors) ---@diagnostic disable-line:unused-function,unused-local
+            for _, color in ipairs(colors) do
+                local c = utils.get_highlight(color[1])[color[2]]
+                if c ~= nil then return c end
+            end
+            error("No fallback exists")
+        end
+
         local function setup_colors()
             return {
                 bg_1 = utils.get_highlight("StatusLine").bg,

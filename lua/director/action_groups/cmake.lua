@@ -43,7 +43,7 @@ local config_types = {
         {
             name = "Generator",
             type = "string",
-            default = "g++",
+            default = "MinGW Makefiles",
             arg_prefix = "-G "
         },
         {

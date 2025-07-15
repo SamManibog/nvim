@@ -1,0 +1,88 @@
+---@alias ConfigFieldType
+---| '"string"'     a string value
+---| '"number"'     a number value
+---| '"boolean"'    a boolean value
+---| '"option"'     one (string) option from a provided list of options
+---| '"list"'       a list of strings
+
+---@alias bind string
+---@alias path string
+---@alias groupName string
+---@alias configName string
+---@alias ActionDataContainer { bound: table<bind, ActionDescriptor>, unbound: ActionDescriptor[] }
+---@alias ConfigData { active: string?, profiles: { [string]: table } } data for a configuration, including the active configuration and profiles
+
+---@class ConfigField
+---@field name string           the name/key for the field
+---@field type ConfigFieldType  the datatype of the configuration fieldd
+---@field default any           the default value (or function provider) for the field. type should match self.type. if type is option, default instead provides the options used where the first option provided is the true default value
+---@field validate (fun(any): boolean)?   a function used to validate the field
+---@field options nil|string[]|(fun():string[]) a function used to provide option values when type is set to "option"
+---@field cmd_omit boolean?                 used in utils.generateCommand
+---@field omit_default boolean?             used in utils.generateCommand
+---@field arg_prefix string?                used in utils.generateCommand
+---@field arg_postfix string?               used in utils.generateCommand
+---@field list_affix boolean?               used in utils.generateCommand
+---@field show_empty boolean?               used in utils.generateCommand
+---@field bool_display boolean?             used in utils.generateCommand
+---@field custom_cmd (fun(any): string)?    used in utils.generateCommand
+
+---@class DirectorBindsConfig
+---@field up string[]?              a list of binds used to move cursor upwards in the menus
+---@field down string[]?            a list of binds used to move cursor downwards in the menus
+---@field select string[]?          a list of binds used to confirm a selection or edit a profile
+---@field new string[]?             a list of binds used to create a new config profile
+---@field rename string[]?          a list of binds used to rename profiles
+---@field delete string[]?          a list of binds used to delete profiles
+---@field edit string[]?            a list of binds used to edit a config profile
+---@field cancel string[]?          a list of binds used to return to the previous menu (or close the menu)
+---@field quick_menu string[]?      a list of binds used to list all actions with keybinds
+---@field file_menu string[]?       a list of binds used to list all actions pertaining to the current file buffer
+---@field directory_menu string[]?  a list of binds used to list all actions pertaining to the current working directory
+---@field main_menu string[]?       a list of binds used to list all loaded actions
+---@field config_menu string[]?     a list of binds used to list all loaded configs
+
+---@class DirectorBindsConfigInternal
+---@field up string[]           a list of binds used to move cursor upwards in the menus
+---@field down string[]         a list of binds used to move cursor downwards in the menus
+---@field select string[]       a list of binds used to confirm a selection or edit a profile
+---@field new string[]          a list of binds used to create a new config profile
+---@field rename string[]       a list of binds used to rename profiles
+---@field delete string[]       a list of binds used to delete profiles
+---@field edit string[]         a list of binds used to edit a config profile
+---@field cancel string[]       a list of binds used to return to the previous menu (or close the menu)
+---@field quick_menu string[]   a list of binds used to list all actions with keybinds
+---@field file_menu string[]    a list of binds used to list all actions pertaining to the current file buffer
+---@field directory_menu string[]   a list of binds used to list all actions pertaining to the current working directory
+---@field main_menu string[]    a list of binds used to list all loaded actions
+---@field config_menu string[]  a list of binds used to list all loaded configs
+
+---@alias ConfigName string the name of a configuration defined by keys in main_config.config_types
+---@alias ConfigKey string  a key corresponding to a given ConfigField defined in main_config.config_types[i]
+---@alias ActionConfig { [ConfigName]: { [ConfigKey]: any } }
+
+---@class ActionDescriptor
+---@field desc string               the displayed discription of the action
+---@field callback fun(config: ActionConfig) | fun()   the function to call when the action is run
+---@field bind string?              the keybinding for the action
+---@field configs string[]?         a list of config types required by the action
+---@field priority number?          if keybinds conflict, the action with the higher priority is bound (default 0 for cwd actions, 100 for file actions)
+
+---@class ActionGroup
+---@field file_local boolean?           Whether the action group applies to a certain file type (alternatively applying to the working directory)
+---@field detect fun(): boolean         A function that determines if the actions in the group should be loaded
+---@field actions ActionDescriptor[]    A list of actions belonging to the group
+---@field config_types table<string, ConfigField[]>? a map defining names for config types, allowing them to be reused but work as configs for separate actions
+---@field priority number?              If keybinds conflict, the default priority of all actions in the group (default 0 for cwd actions, 100 for file actions)
+
+---@class DirectorConfig
+---@field preserve boolean?                     whether or not to save in-editor configuration to disk
+---@field binds DirectorBindsConfig?            binds for menus
+---@field actions table<groupName, ActionGroup> a list of action groups that may be used
+
+---@class DirectorConfigInternal
+---@field preserve boolean                      whether or not to save in-editor configuration to disk
+---@field binds DirectorBindsConfigInternal         binds for menus
+---@field actions table<groupName, ActionGroup> a list of action groups that may be used
+---@field cwd_actions table<groupName, ActionGroup> a list of action groups that may be used in the cwd
+---@field file_actions table<groupName, ActionGroup> a list of action groups that may be used in the file

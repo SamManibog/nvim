@@ -1,5 +1,8 @@
 local M = {}
 
+------------------------------------------------------------------------------------------------------------
+--Imports
+------------------------------------------------------------------------------------------------------------
 local Popup = require("oneup.popup")
 local PromptPopup = require("oneup.prompt_popup")
 local OptionsPopup = require("oneup.options_popup")
@@ -8,78 +11,10 @@ local Line = require("oneup.line")
 local Text = require("oneup.text")
 local utils = require("director.utils")
 
----@alias ConfigFieldType
----| '"string"'     a string value
----| '"number"'     a number value
----| '"boolean"'    a boolean value
----| '"option"'     one (string) option from a provided list of options
----| '"list"'       a list of strings
-
----@class ConfigField
----@field name string           the name/key for the field
----@field type ConfigFieldType  the datatype of the configuration fieldd
----@field default any           the default value (or function provider) for the field. type should match self.type. if type is option, default instead provides the options used where the first option provided is the true default value
----@field validate (fun(any): boolean)?   a function used to validate the field
----@field options nil|string[]|(fun():string[]) a function used to provide option values when type is set to "option"
----@field cmd_omit boolean?                 used in utils.generateCommand
----@field omit_default boolean?             used in utils.generateCommand
----@field arg_prefix string?                used in utils.generateCommand
----@field arg_postfix string?               used in utils.generateCommand
----@field list_affix boolean?               used in utils.generateCommand
----@field show_empty boolean?               used in utils.generateCommand
----@field bool_display boolean?             used in utils.generateCommand
----@field custom_cmd (fun(any): string)?    used in utils.generateCommand
-
----@class DirectorBindsConfig
----@field up string[]           a list of binds used to move cursor upwards in the menus
----@field down string[]         a list of binds used to move cursor downwards in the menus
----@field select string[]       a list of binds used to confirm a selection or edit a profile
----@field new string[]          a list of binds used to create a new config profile
----@field rename string[]       a list of binds used to rename profiles
----@field delete string[]       a list of binds used to delete profiles
----@field edit string[]         a list of binds used to edit a config profile
----@field cancel string[]       a list of binds used to return to the previous menu (or close the menu)
----@field quick_menu string[]   a list of binds used to list all actions with keybinds
----@field file_menu string[]    a list of binds used to list all actions pertaining to the current file buffer
----@field directory_menu string[]   a list of binds used to list all actions pertaining to the current working directory
----@field main_menu string[]    a list of binds used to list all loaded actions
----@field config_menu string[]  a list of binds used to list all loaded configs
-
----@alias ConfigName string the name of a configuration defined by keys in main_config.config_types
----@alias ConfigKey string  a key corresponding to a given ConfigField defined in main_config.config_types[i]
----@alias ActionConfig { [ConfigName]: { [ConfigKey]: any } }
-
----@class ActionDescriptor
----@field desc string               the displayed discription of the action
----@field callback fun(config: ActionConfig) | fun()   the function to call when the action is run
----@field bind string?              the keybinding for the action
----@field configs string[]?         a list of config types required by the action
----@field priority number?          if keybinds conflict, the action with the higher priority is bound (default 0 for cwd actions, 100 for file actions)
-
----@class ActionGroup
----@field file_local boolean?           Whether the action group applies to a certain file type (alternatively applying to the working directory)
----@field detect fun(): boolean         A function that determines if the actions in the group should be loaded
----@field actions ActionDescriptor[]    A list of actions belonging to the group
----@field config_types table<string, ConfigField[]>? a map defining names for config types, allowing them to be reused but work as configs for separate actions
----@field priority number?              If keybinds conflict, the default priority of all actions in the group (default 0 for cwd actions, 100 for file actions)
-
----@class DirectorConfig
----@field preserve boolean                      whether or not to save in-editor configuration to disk
----@field binds DirectorBindsConfig             binds for menus
----@field actions table<groupName, ActionGroup> a list of action groups that may be used
----@field cwd_actions table<groupName, ActionGroup> a list of action groups that may be used in the cwd
----@field file_actions table<groupName, ActionGroup> a list of action groups that may be used in the file
-
----@alias bind string
----@alias path string
----@alias groupName string
----@alias configName string
-
----@alias ActionDataContainer { bound: table<bind, ActionDescriptor>, unbound: ActionDescriptor[] }
-
----@alias ConfigData { active: string?, profiles: { [string]: table } } data for a configuration, including the active configuration and profiles
-
----@type DirectorConfig global *CONSTANT* state
+------------------------------------------------------------------------------------------------------------
+--Locals/State
+------------------------------------------------------------------------------------------------------------
+---@type DirectorConfigInternal global *CONSTANT* state
 local main_config = {} ---@diagnostic disable-line:missing-fields
 
 --action configuration
@@ -87,7 +22,7 @@ local main_config = {} ---@diagnostic disable-line:missing-fields
 ---@type { [path]: { [groupName]: { [ConfigName]: ConfigData } } }
 local config_data = {}
 
--- list of directory actions
+--list of directory actions
 ---@type { [groupName]: { bound: table<bind, ActionDescriptor>, unbound: ActionDescriptor[] } }
 local cwd_actions = {}
 
@@ -108,6 +43,24 @@ local file_bind_info = {}
 ---@type { file: string?, modified: { path: path, group: groupName, config: configName }[] }
 local director_state = { modified = {} }
 
+------------------------------------------------------------------------------------------------------------
+--Internal Utils
+------------------------------------------------------------------------------------------------------------
+---gets the default profile for a configuration given a list of fields
+---@param fields ConfigField[]
+---@return table
+local function getDefaultProfile(fields)
+    local out = {}
+    for _, field in ipairs(fields) do
+        if type(field.default) == "function" then
+            out[field.name] = field.default()
+        else
+            out[field.name] = field.default
+        end
+    end
+    return out
+end
+
 local function flagModified(path, group, config)
     for _, mod in ipairs(director_state.modified) do
         if path == mod.path and group == mod.group and config == mod.config then
@@ -122,6 +75,14 @@ local function getcwd()
     local path, _ = string.gsub(vim.fn.getcwd().."/", "\\", "/")
     return path
 end
+
+---determines if a string is a valid name for a config descriptor, group name, or group field name
+---@param name string the string to check if it is a valid name
+---@return boolean is_valid whether or not name is valid
+local function isValidName(name)
+    return #name >= 1 and #name <= 24 and name:match("[^%w_ ]") == nil
+end
+
 
 ---@type string[]
 local path_hash_valid_characters = {}
@@ -173,154 +134,6 @@ local function getPathHash(path)
     end
 
     return hash
-end
-
----setup the plugin
----@param opts? table
-function M.setup(opts)
-    local default = require("director.defaults")
-
-    ---@type DirectorConfig
-    main_config = opts or {}
-    if main_config.actions == nil then main_config.actions = default.actions end
-    if main_config.preserve == nil then main_config.preserve = default.preserve end
-    if main_config.binds == nil then main_config.binds = {} end ---@diagnostic disable-line:missing-fields
-    main_config.binds = vim.tbl_extend("keep", main_config.binds, default.binds)
-
-    main_config.file_actions = {}
-    main_config.cwd_actions = {}
-    for group_name, group in pairs(main_config.actions) do
-        if group.file_local then
-            main_config.file_actions[group_name] = group
-        else
-            main_config.cwd_actions[group_name] = group
-        end
-    end
-
-    --setup binds
-    for key, value in pairs(main_config.binds) do
-        if type(value) == "string" then
-            main_config.binds[key] = { value }
-        end
-    end
-    for _, bind in pairs(main_config.binds.main_menu) do
-        vim.keymap.set("n", bind, M.mainMenu)
-    end
-    for _, bind in pairs(main_config.binds.quick_menu) do
-        vim.keymap.set("n", bind, M.quickMenu)
-    end
-    for _, bind in pairs(main_config.binds.directory_menu) do
-        vim.keymap.set("n", bind, M.directoryMenu)
-    end
-    for _, bind in pairs(main_config.binds.file_menu) do
-        vim.keymap.set("n", bind, M.fileMenu)
-    end
-    for _, bind in pairs(main_config.binds.config_menu) do
-        vim.keymap.set("n", bind, M.configMenu)
-    end
-
-    --initial refresh of cwd actions
-    vim.api.nvim_create_autocmd(
-        'UIEnter',
-        {
-            callback = function()
-                M.refreshCwdActions()
-                file_actions = {}
-                file_bind_info = {}
-            end
-        }
-    )
-
-    --auto refresh cwd actions
-    vim.api.nvim_create_autocmd(
-        'DirChanged',
-        {
-            pattern = 'global',
-            callback = function()
-                M.refreshCwdActions()
-                file_actions = {}
-                file_bind_info = {}
-            end
-        }
-    )
-
-    --auto refresh file actions and current file
-    vim.api.nvim_create_autocmd(
-        'BufEnter',
-        {
-            callback = function()
-                local path = vim.fn.expand("%:p")
-                path = string.gsub(path, "\\", "/")
-
-                if vim.fn.filereadable(path) == 1 then
-                    director_state.file = path
-                end
-
-                M.loadFileActions()
-            end
-        }
-    )
-
-    --save data to disk before closing
-    vim.api.nvim_create_autocmd(
-        'ExitPre',
-        {
-            callback = function()
-                M.saveConfigs()
-            end
-        }
-    )
-
-    vim.api.nvim_create_user_command(
-        "DirectorSave",
-        function (_)
-            M.saveConfigs()
-        end,
-        {
-            nargs = 0,
-            desc = "Saves all changes made on director configurations",
-        }
-    )
-
-    --Director command (to open menus) or save configs
-    vim.api.nvim_create_user_command(
-        "Director",
-        function (cmd)
-            local help ="Director command can be run with the following arguments:"
-            .."\t    (q)uick - to list all commands with keybinds"
-            .."\t     (m)ain - to list all loaded commands"
-            .."\t(d)irectory - to list all working directory commands"
-            .."\t     (f)ile - to list all file commands"
-            .."\t   (c)onfig - to open the configuration menu"
-            .."\t     (s)ave - to force save all configuration changes"
-
-            if cmd.fargs[1] == nil then
-                print(help)
-                return
-            end
-
-            local arg = string.lower(string.sub(cmd.fargs[1], 1, 1))
-            if arg == "m" then
-                M.mainMenu()
-            elseif arg == "d" then
-                M.directoryMenu()
-            elseif arg == "f" then
-                M.fileMenu()
-            elseif arg == "q" then
-                M.quickMenu()
-            elseif arg == "c" then
-                M.configMenu()
-            elseif arg == "s" then
-                M.saveConfigs()
-            else
-                print(help)
-            end
-        end,
-        {
-            nargs = "?",
-            desc = "Director command center"
-        }
-    )
 end
 
 ---reads the manifest file, returning the data folder corresponding to the given path
@@ -512,18 +325,6 @@ local function saveGroupConfig(path, group_name, config_name)
     end
 end
 
-function M.saveConfigs()
-    if main_config.preserve == false then return end
-
-    for _, mod in ipairs(director_state.modified) do
-        saveGroupConfig(mod.path, mod.group, mod.config)
-    end
-    for _, mod in ipairs(director_state.modified) do
-        attemptClean(mod.path, mod.group, mod.config)
-    end
-    director_state.modified = {}
-end
-
 ---loads from disk the config data for the given group
 ---@param path path the name of the scope for the config
 ---@param group_name groupName the group for which to load configs
@@ -555,7 +356,7 @@ local function loadGroupConfigs(path, group_name)
 
     --load group configs
     for name, _ in pairs(group.config_types) do
-        if not utils.isValidName(name) then
+        if not isValidName(name) then
             print(
                 "Attempted to load config with invalid name '" .. group_name .. "'."
                 .. "Names may only contain alphanumeric characters, underscores, and spaces."
@@ -576,7 +377,7 @@ local function loadGroupConfigs(path, group_name)
             --load config profiles
             if config ~= nil and config.profiles ~= nil then
                 for profile_name, profile in pairs(config.profiles) do
-                    if not utils.isValidName(profile_name) then
+                    if not isValidName(profile_name) then
                         print(
                             "Attempted to load profile with invalid name '" .. profile_name .. "'."
                             .. "Names may only contain alphanumeric characters, underscores, and spaces."
@@ -655,73 +456,12 @@ local function loadGroupActions(group_name, load_location, bind_info_location, p
     end
 end
 
----refreshes actions belonging to the current working directory
-function M.refreshCwdActions()
-    M.saveConfigs()
-
-    local cwd = getcwd()
-
-    cwd_actions = {}
-    cwd_bind_info = {}
-
-    --load groups
-    for name, group in pairs(main_config.cwd_actions) do
-        local no_skip = true
-        if group.file_local or not group.detect() then no_skip = false end
-
-        if not utils.isValidName(name) then
-            print(
-                "Attempted to load group with invalid name '" .. name .. "'."
-                .. "Names may only contain alphanumeric characters, underscores, and spaces."
-            )
-            no_skip = false
-        end
-
-        if no_skip then
-            cwd_actions[name] = { bound = {}, unbound = {} }
-
-            loadGroupConfigs(cwd, name)
-            loadGroupActions(name, cwd_actions[name], cwd_bind_info, nil)
-        end
-    end
-end
-
----refreshes actions belonging to the current working directory
-function M.loadFileActions()
-    local path = director_state.file
-    if path == nil or file_actions[director_state.file] ~= nil then return end
-
-    file_actions[path] = {}
-    file_bind_info[path] = {}
-
-    --load groups
-    for name, group in pairs(main_config.file_actions) do
-        local no_skip = true
-        if (not group.file_local) or (not group.detect()) then no_skip = false end
-
-        if not utils.isValidName(name) then
-            print(
-                "Attempted to load group with invalid name '" .. name .. "'."
-                .. "Names may only contain alphanumeric characters, underscores, and spaces."
-            )
-            no_skip = false
-        end
-
-        if no_skip then
-            file_actions[path][name] = { bound = {}, unbound = {} }
-
-            loadGroupConfigs(path, name)
-            loadGroupActions(name, file_actions[path][name], file_bind_info[path], path)
-        end
-    end
-end
-
 ---returns the table that will be passed to the given action's callback when ran
 ---@param path path the path scope of the action
 ---@param group_name groupName the name of the group in which the action is found
 ---@param action_configs ConfigName[] a list of configs to load from the given group
 ---@return ActionConfig config the configuration to be passed to the action
-function M.getActionConfigs(path, group_name, action_configs)
+local function getActionConfigs(path, group_name, action_configs)
     ---@type ActionConfig
     local out = {}
 
@@ -730,7 +470,7 @@ function M.getActionConfigs(path, group_name, action_configs)
 
     for _, config_name in pairs(action_configs) do
         if action_data[config_name].active == nil then
-            out[config_name] = utils.getDefaultProfile(main_config.actions[group_name].config_types[config_name])
+            out[config_name] = getDefaultProfile(main_config.actions[group_name].config_types[config_name])
         else
             out[config_name] = action_data[config_name].profiles[action_data[config_name].active]
         end
@@ -786,7 +526,7 @@ local function openActionsMenu(title, actions, file_path)
                 callback = action.callback
             else
                 callback = function()
-                    action.callback(M.getActionConfigs(path, group_name, action.configs))
+                    action.callback(getActionConfigs(path, group_name, action.configs))
                 end
             end
 
@@ -807,7 +547,7 @@ local function openActionsMenu(title, actions, file_path)
                 callback = action.callback
             else
                 callback = function()
-                    action.callback(M.getActionConfigs(path, group_name, action.configs))
+                    action.callback(getActionConfigs(path, group_name, action.configs))
                 end
             end
 
@@ -851,130 +591,99 @@ local function openActionsMenu(title, actions, file_path)
     end
 end
 
----accesses all detected actions with bindings into a menu
-function M.quickMenu()
-    ---@type { [groupName]: ActionDataContainer }
-    local actions = {}
-
-    for bind, bind_info in pairs(cwd_bind_info) do
-        if actions[bind_info.group_name] == nil then
-            actions[bind_info.group_name] = { bound = {}, unbound = {} }
-        end
-
-        actions[bind_info.group_name].bound[bind] = cwd_actions[bind_info.group_name].bound[bind]
-    end
-
-    local file_path = director_state.file or ""
-    if vim.fn.filereadable(file_path) == 1 then
-        for bind, bind_info in pairs(file_bind_info[file_path]) do
-            if actions[bind_info.group_name] == nil then
-                actions[bind_info.group_name] = { bound = {}, unbound = {} }
-            end
-
-            local file_action = file_actions[file_path][bind_info.group_name].bound[bind]
-
-            --handle priority
-            if cwd_bind_info[bind] == nil then
-                actions[bind_info.group_name].bound[bind] = file_action
-            else
-                local priority = 100
-                if file_action.priority ~= nil then
-                    priority = file_action.priority
-                end
-
-                local cwd_priority = 0
-                if cwd_bind_info[bind].priority ~= nil then
-                    cwd_priority = cwd_bind_info[bind].priority
-                end
-
-                if priority >= cwd_priority then
-                    actions[bind_info.group_name].bound[bind] = file_action
-                    actions[cwd_bind_info[bind].group_name].bound[bind] = nil
-                end
-            end
-        end
-    end
-
-    openActionsMenu(" Quick Actions ", actions, file_path)
-end
-
----accesses all detected actions for the cwd
-function M.directoryMenu()
-    local file_path = director_state.file or ""
-
-    openActionsMenu(" Directory Actions ", cwd_actions, file_path)
-end
-
----accesses all detected active file-specific actions
-function M.fileMenu()
-    local file_path = director_state.file or ""
-
-    if vim.fn.filereadable(file_path) == 1 then
-        openActionsMenu(" File Actions ", file_actions[file_path], file_path)
+---converts a config field type to its respective highlight group
+---@param type ConfigFieldType
+---@return string
+local function typeToHl(type)
+    if type == "number" then
+        return "Number"
+    elseif type == "boolean" then
+        return "Boolean"
     else
-        print("Director File Menu could not be opened for the current buffer as it is not associated with a file.")
+        return "String"
     end
 end
 
----accesses all detected actions
-function M.mainMenu()
-    ---@type { [groupName]: ActionDataContainer }
-    local actions = {}
-
-    for name, group in pairs(cwd_actions) do
-        actions[name] = { bound = {}, unbound = {} }
-
-        for bind, action in pairs(group.bound) do
-            actions[name].bound[bind] = action
-        end
-
-        for idx, action in pairs(group.unbound) do
-            actions[name].unbound[idx] = action
-        end
+---@param path string
+---@param group string
+---@param config string
+---@param profile? string
+---@param show_profile? boolean
+---@return Line[]
+local function configPreview(path, group, config, profile, show_profile)
+    local profile = profile ---@diagnostic disable-line:redefined-local
+    if
+        config_data[path] == nil
+        or config_data[path][group] == nil
+        or config_data[path][group][config] == nil
+    then
+        error("Invalid config preview")
     end
 
-    local file_path = director_state.file or ""
-    if vim.fn.filereadable(file_path) == 1 then
-        for name, group in pairs(file_actions[file_path]) do
-            actions[name] = { bound = {}, unbound = {} }
+    local cfg = config_data[path][group][config].profiles[profile]
+    local fields = main_config.actions[group].config_types[config]
 
-            for bind, action in pairs(group.bound) do
-                if cwd_bind_info[bind] == nil then
-                    actions[name].bound[bind] = action
-                else
+    local out
 
-                    local priority = 100
-                    if action.priority ~= nil then
-                        priority = action.priority
-                    end
+    if show_profile then
+        if profile == nil then
+            out = { Line("PROFILE: [DEFAULT]", { hl_group = "PreProc"} ) }
+        else
+            out = { Line("PROFILE: "..profile, { hl_group = "PreProc"} ) }
+        end
+    else
+        out = {}
+    end
 
-                    local cwd_priority = 0
-                    local cwd_group = cwd_bind_info[bind].group_name
-                    if cwd_bind_info[bind].priority ~= nil then
-                        cwd_priority = cwd_bind_info[bind].priority
-                    end
+    if profile == nil then cfg = getDefaultProfile(fields) end
 
-                    if priority >= cwd_priority then
-                        actions[name].bound[bind] = action
-                        table.insert(actions[cwd_group].unbound, actions[cwd_group].bound[bind])
-                        actions[cwd_group].bound[bind] = nil
-                    else
-                        table.insert(actions[name].unbound, action)
-                    end
+    for _, field in pairs(fields) do
+        local value = cfg[field.name]
+
+        if field.type == "list" then
+            if #value <= 0 then
+                table.insert(out, Line({
+                    Text(field.name, { hl_group = "Identifier" }),
+                    Text(": [],", { hl_group = "Operator" })
+                }))
+            else
+                table.insert(out, Line({
+                    Text(field.name, { hl_group = "Identifier" }),
+                    Text(": [", { hl_group = "Operator" })
+                }))
+                for _, entry in ipairs(value) do
+                    table.insert(out, Line({
+                        Text("\t\""..tostring(entry).."\"", { hl_group = "String" }),
+                        Text(",", { hl_group = "Operator" })
+                    }))
                 end
+                table.insert(out, Line("],", { hl_group = "Operator" }))
+            end
+        else
+            if field.type == "string" or field.type == "option" then
+                value = "\""..value.."\""
+            else
+                value = tostring(value)
             end
 
-            for idx, action in pairs(group.unbound) do
-                actions[name].unbound[idx] = action
-            end
+            table.insert(out, Line({
+                Text(field.name, { hl_group = "Identifier" }),
+                Text(":", { hl_group = "Operator" }),
+                Text(" "..value, { hl_group = typeToHl(field.type) }),
+                Text(",", { hl_group = "Operator" }),
+            }))
         end
     end
 
-    openActionsMenu(" Actions ", actions, file_path)
+    return out
 end
 
----@type function, function, function, function
-local configFieldMenu, configProfilesMenu, configProfileEditor
+---@type function
+local configFieldMenu = nil
+---@type function
+local configProfilesMenu = nil
+---@type function
+local configProfileEditor = nil
 
 ---opens the config menu for a specific field in a configuration
 configFieldMenu = function(path, group, config, profile, field)
@@ -1157,19 +866,6 @@ configFieldMenu = function(path, group, config, profile, field)
     end
 end
 
----converts a config field type to its respective highlight group
----@param type ConfigFieldType
----@return string
-local function typeToHl(type)
-    if type == "number" then
-        return "Number"
-    elseif type == "boolean" then
-        return "Boolean"
-    else
-        return "String"
-    end
-end
-
 ---opens the config menu for a specific profile
 configProfileEditor = function(path, group, config, profile)
     local cfg = config_data[path][group][config].profiles[profile]
@@ -1242,100 +938,6 @@ configProfileEditor = function(path, group, config, profile)
     end
 end
 
----@param path string
----@param group string
----@param config string
----@param profile? string
----@param show_profile? boolean
----@return Line[]
-local function configPreview(path, group, config, profile, show_profile)
-    local profile = profile ---@diagnostic disable-line:redefined-local
-    if
-        config_data[path] == nil
-        or config_data[path][group] == nil
-        or config_data[path][group][config] == nil
-    then
-        error("Invalid config preview")
-    end
-
-    local cfg = config_data[path][group][config].profiles[profile]
-    local fields = main_config.actions[group].config_types[config]
-
-    local out
-
-    if show_profile then
-        if profile == nil then
-            out = { Line("PROFILE: [DEFAULT]", { hl_group = "PreProc"} ) }
-        else
-            out = { Line("PROFILE: "..profile, { hl_group = "PreProc"} ) }
-        end
-    else
-        out = {}
-    end
-
-    if profile == nil then
-        for _, field in pairs(fields) do
-            local value
-            if type(field.default) == "function" then
-                value = field.default()
-            else
-                value = field.default
-            end
-
-            if field.type == "list" then
-                table.insert(out, Line({
-                    Text(field.name, { hl_group = "Identifier" }),
-                    Text(":", { hl_group = "Operator" })
-                }))
-                for _, entry in ipairs(value) do
-                    table.insert(out, Line("\t\""..tostring(entry).."\"", { hl_group = "String" }))
-                end
-            else
-                if field.type == "string" or field.type == "option" then
-                    value = "\""..value.."\""
-                else
-                    value = tostring(value)
-                end
-
-                table.insert(out, Line({
-                    Text(field.name, { hl_group = "Identifier" }),
-                    Text(":", { hl_group = "Operator" }),
-                    Text(" "..value, { hl_group = typeToHl(field.type) }),
-                }))
-            end
-        end
-
-    else
-        for _, field in pairs(fields) do
-            local value = cfg[field.name]
-
-            if field.type == "list" then
-                table.insert(out, Line({
-                    Text(field.name, { hl_group = "Identifier" }),
-                    Text(":", { hl_group = "Operator" })
-                }))
-                for _, entry in ipairs(value) do
-                    table.insert(out, Line("\t\""..tostring(entry).."\"", { hl_group = "String" }))
-                end
-            else
-                if field.type == "string" or field.type == "option" then
-                    value = "\""..value.."\""
-                else
-                    value = tostring(value)
-                end
-
-                table.insert(out, Line({
-                    Text(field.name, { hl_group = "Identifier" }),
-                    Text(":", { hl_group = "Operator" }),
-                    Text(" "..value, { hl_group = typeToHl(field.type) }),
-                }))
-            end
-        end
-    end
-
-    return out
-end
-
 local function newProfileMenu(path, group, config)
     local p
     p = PromptPopup:new({
@@ -1348,7 +950,7 @@ local function newProfileMenu(path, group, config)
         prompt = "> ",
         title = " New Profile ",
         verify_input = function(name)
-            if utils.isValidName(name) then
+            if isValidName(name) then
                 if config_data[path][group][config].profiles[name] == nil then
                     return true
                 else
@@ -1363,7 +965,7 @@ local function newProfileMenu(path, group, config)
         width = { min = 20, value = "30%" },
         close_bind = main_config.binds.cancel,
         on_confirm = function (name)
-            config_data[path][group][config].profiles[name] = utils.getDefaultProfile(
+            config_data[path][group][config].profiles[name] = getDefaultProfile(
                 main_config.actions[group].config_types[config]
             )
             flagModified(path, group, config)
@@ -1432,7 +1034,7 @@ local function renameProfileMenu(path, group, config, profile)
         prompt = "> ",
         title = " Rename Profile ",
         verify_input = function(name)
-            if utils.isValidName(name) then
+            if isValidName(name) then
                 if config_data[path][group][config].profiles[name] == nil then
                     return true
                 else
@@ -1575,6 +1177,352 @@ configProfilesMenu = function(path, group, config)
     end
 end
 
+------------------------------------------------------------------------------------------------------------
+--API
+------------------------------------------------------------------------------------------------------------
+---setup the plugin
+---@param opts? DirectorConfig
+function M.setup(opts)
+    local default = require("director.defaults")
+
+    ---@type DirectorConfigInternal
+    main_config = opts or {} ---@diagnostic disable-line:assign-type-mismatch
+    if main_config.actions == nil then main_config.actions = default.actions end
+    if main_config.preserve == nil then main_config.preserve = default.preserve end
+    if main_config.binds == nil then main_config.binds = {} end ---@diagnostic disable-line:missing-fields
+    main_config.binds = vim.tbl_extend("keep", main_config.binds, default.binds)
+
+    main_config.file_actions = {}
+    main_config.cwd_actions = {}
+    for group_name, group in pairs(main_config.actions) do
+        if group.file_local then
+            main_config.file_actions[group_name] = group
+        else
+            main_config.cwd_actions[group_name] = group
+        end
+    end
+
+    --setup binds
+    for key, value in pairs(main_config.binds) do
+        if type(value) == "string" then
+            main_config.binds[key] = { value }
+        end
+    end
+    for _, bind in pairs(main_config.binds.main_menu) do
+        vim.keymap.set("n", bind, M.mainMenu)
+    end
+    for _, bind in pairs(main_config.binds.quick_menu) do
+        vim.keymap.set("n", bind, M.quickMenu)
+    end
+    for _, bind in pairs(main_config.binds.directory_menu) do
+        vim.keymap.set("n", bind, M.directoryMenu)
+    end
+    for _, bind in pairs(main_config.binds.file_menu) do
+        vim.keymap.set("n", bind, M.fileMenu)
+    end
+    for _, bind in pairs(main_config.binds.config_menu) do
+        vim.keymap.set("n", bind, M.configMenu)
+    end
+
+    --initial refresh of cwd actions
+    vim.api.nvim_create_autocmd(
+        'UIEnter',
+        {
+            callback = function()
+                M.refreshCwdActions()
+                file_actions = {}
+                file_bind_info = {}
+            end
+        }
+    )
+
+    --auto refresh cwd actions
+    vim.api.nvim_create_autocmd(
+        'DirChanged',
+        {
+            pattern = 'global',
+            callback = function()
+                M.refreshCwdActions()
+                file_actions = {}
+                file_bind_info = {}
+            end
+        }
+    )
+
+    --auto refresh file actions and current file
+    vim.api.nvim_create_autocmd(
+        'BufEnter',
+        {
+            callback = function()
+                local path = vim.fn.expand("%:p")
+                path = string.gsub(path, "\\", "/")
+
+                if vim.fn.filereadable(path) == 1 then
+                    director_state.file = path
+                end
+
+                M.loadFileActions()
+            end
+        }
+    )
+
+    --save data to disk before closing
+    vim.api.nvim_create_autocmd(
+        'ExitPre',
+        {
+            callback = function()
+                M.saveConfigs()
+            end
+        }
+    )
+
+    vim.api.nvim_create_user_command(
+        "DirectorSave",
+        function (_)
+            M.saveConfigs()
+        end,
+        {
+            nargs = 0,
+            desc = "Saves all changes made on director configurations",
+        }
+    )
+
+    --Director command (to open menus) or save configs
+    vim.api.nvim_create_user_command(
+        "Director",
+        function (cmd)
+            local help ="Director command can be run with the following arguments:"
+            .."\t    (q)uick - to list all commands with keybinds"
+            .."\t     (m)ain - to list all loaded commands"
+            .."\t(d)irectory - to list all working directory commands"
+            .."\t     (f)ile - to list all file commands"
+            .."\t   (c)onfig - to open the configuration menu"
+            .."\t     (s)ave - to force save all configuration changes"
+
+            if cmd.fargs[1] == nil then
+                print(help)
+                return
+            end
+
+            local arg = string.lower(string.sub(cmd.fargs[1], 1, 1))
+            if arg == "m" then
+                M.mainMenu()
+            elseif arg == "d" then
+                M.directoryMenu()
+            elseif arg == "f" then
+                M.fileMenu()
+            elseif arg == "q" then
+                M.quickMenu()
+            elseif arg == "c" then
+                M.configMenu()
+            elseif arg == "s" then
+                M.saveConfigs()
+            else
+                print(help)
+            end
+        end,
+        {
+            nargs = "?",
+            desc = "Director command center"
+        }
+    )
+end
+
+function M.saveConfigs()
+    if main_config.preserve == false then return end
+
+    for _, mod in ipairs(director_state.modified) do
+        saveGroupConfig(mod.path, mod.group, mod.config)
+    end
+    for _, mod in ipairs(director_state.modified) do
+        attemptClean(mod.path, mod.group, mod.config)
+    end
+    director_state.modified = {}
+end
+
+---refreshes actions belonging to the current working directory
+function M.refreshCwdActions()
+    M.saveConfigs()
+
+    local cwd = getcwd()
+
+    cwd_actions = {}
+    cwd_bind_info = {}
+
+    --load groups
+    for name, group in pairs(main_config.cwd_actions) do
+        local no_skip = true
+        if group.file_local or not group.detect() then no_skip = false end
+
+        if not isValidName(name) then
+            print(
+                "Attempted to load group with invalid name '" .. name .. "'."
+                .. "Names may only contain alphanumeric characters, underscores, and spaces."
+            )
+            no_skip = false
+        end
+
+        if no_skip then
+            cwd_actions[name] = { bound = {}, unbound = {} }
+
+            loadGroupConfigs(cwd, name)
+            loadGroupActions(name, cwd_actions[name], cwd_bind_info, nil)
+        end
+    end
+end
+
+---refreshes actions belonging to the current file
+function M.loadFileActions()
+    local path = director_state.file
+    if path == nil or file_actions[director_state.file] ~= nil then return end
+
+    file_actions[path] = {}
+    file_bind_info[path] = {}
+
+    --load groups
+    for name, group in pairs(main_config.file_actions) do
+        local no_skip = true
+        if (not group.file_local) or (not group.detect()) then no_skip = false end
+
+        if not isValidName(name) then
+            print(
+                "Attempted to load group with invalid name '" .. name .. "'."
+                .. "Names may only contain alphanumeric characters, underscores, and spaces."
+            )
+            no_skip = false
+        end
+
+        if no_skip then
+            file_actions[path][name] = { bound = {}, unbound = {} }
+
+            loadGroupConfigs(path, name)
+            loadGroupActions(name, file_actions[path][name], file_bind_info[path], path)
+        end
+    end
+end
+
+---accesses all detected actions with bindings into a menu
+function M.quickMenu()
+    ---@type { [groupName]: ActionDataContainer }
+    local actions = {}
+
+    for bind, bind_info in pairs(cwd_bind_info) do
+        if actions[bind_info.group_name] == nil then
+            actions[bind_info.group_name] = { bound = {}, unbound = {} }
+        end
+
+        actions[bind_info.group_name].bound[bind] = cwd_actions[bind_info.group_name].bound[bind]
+    end
+
+    local file_path = director_state.file or ""
+    if vim.fn.filereadable(file_path) == 1 then
+        for bind, bind_info in pairs(file_bind_info[file_path]) do
+            if actions[bind_info.group_name] == nil then
+                actions[bind_info.group_name] = { bound = {}, unbound = {} }
+            end
+
+            local file_action = file_actions[file_path][bind_info.group_name].bound[bind]
+
+            --handle priority
+            if cwd_bind_info[bind] == nil then
+                actions[bind_info.group_name].bound[bind] = file_action
+            else
+                local priority = 100
+                if file_action.priority ~= nil then
+                    priority = file_action.priority
+                end
+
+                local cwd_priority = 0
+                if cwd_bind_info[bind].priority ~= nil then
+                    cwd_priority = cwd_bind_info[bind].priority
+                end
+
+                if priority >= cwd_priority then
+                    actions[bind_info.group_name].bound[bind] = file_action
+                    actions[cwd_bind_info[bind].group_name].bound[bind] = nil
+                end
+            end
+        end
+    end
+
+    openActionsMenu(" Quick Actions ", actions, file_path)
+end
+
+---accesses all detected actions for the cwd
+function M.directoryMenu()
+    local file_path = director_state.file or ""
+
+    openActionsMenu(" Directory Actions ", cwd_actions, file_path)
+end
+
+---accesses all detected active file-specific actions
+function M.fileMenu()
+    local file_path = director_state.file or ""
+
+    if vim.fn.filereadable(file_path) == 1 then
+        openActionsMenu(" File Actions ", file_actions[file_path], file_path)
+    else
+        print("Director File Menu could not be opened for the current buffer as it is not associated with a file.")
+    end
+end
+
+---accesses all detected actions
+function M.mainMenu()
+    ---@type { [groupName]: ActionDataContainer }
+    local actions = {}
+
+    for name, group in pairs(cwd_actions) do
+        actions[name] = { bound = {}, unbound = {} }
+
+        for bind, action in pairs(group.bound) do
+            actions[name].bound[bind] = action
+        end
+
+        for idx, action in pairs(group.unbound) do
+            actions[name].unbound[idx] = action
+        end
+    end
+
+    local file_path = director_state.file or ""
+    if vim.fn.filereadable(file_path) == 1 then
+        for name, group in pairs(file_actions[file_path]) do
+            actions[name] = { bound = {}, unbound = {} }
+
+            for bind, action in pairs(group.bound) do
+                if cwd_bind_info[bind] == nil then
+                    actions[name].bound[bind] = action
+                else
+
+                    local priority = 100
+                    if action.priority ~= nil then
+                        priority = action.priority
+                    end
+
+                    local cwd_priority = 0
+                    local cwd_group = cwd_bind_info[bind].group_name
+                    if cwd_bind_info[bind].priority ~= nil then
+                        cwd_priority = cwd_bind_info[bind].priority
+                    end
+
+                    if priority >= cwd_priority then
+                        actions[name].bound[bind] = action
+                        table.insert(actions[cwd_group].unbound, actions[cwd_group].bound[bind])
+                        actions[cwd_group].bound[bind] = nil
+                    else
+                        table.insert(actions[name].unbound, action)
+                    end
+                end
+            end
+
+            for idx, action in pairs(group.unbound) do
+                actions[name].unbound[idx] = action
+            end
+        end
+    end
+
+    openActionsMenu(" Actions ", actions, file_path)
+end
+
 ---accesses mainMenu action configurations
 function M.configMenu()
     ---@type PreviewedOption[]
@@ -1650,15 +1598,9 @@ function M.configMenu()
     end
 end
 
---TODO INCOMPLETE:
--- finish cmake submodule test configuration/actions
---
 --TODO BUGS:
 --
 --TODO NEW FEATURES:
--- list config elements should be enclosed in brackets in preview menu
 -- add ability to have prompt text for each action config field
--- change name of submodules folder ("action_groups")
--- write submodules into folders with readmes thereby allowing for easier configurations
 
 return M
