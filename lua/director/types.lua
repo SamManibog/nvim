@@ -11,6 +11,9 @@
 ---@alias configName string
 ---@alias ActionDataContainer { bound: table<bind, ActionDescriptor>, unbound: ActionDescriptor[] }
 ---@alias ConfigData { active: string?, profiles: { [string]: table } } data for a configuration, including the active configuration and profiles
+---@alias ConfigName string the name of a configuration defined by keys in main_config.config_types
+---@alias ConfigKey string  a key corresponding to a given ConfigField defined in main_config.config_types[i]
+---@alias ActionConfig { [ConfigName]: { [ConfigKey]: any } }
 
 ---@class ConfigField
 ---@field name string           the name/key for the field
@@ -56,10 +59,6 @@
 ---@field directory_menu string[]   a list of binds used to list all actions pertaining to the current working directory
 ---@field main_menu string[]    a list of binds used to list all loaded actions
 ---@field config_menu string[]  a list of binds used to list all loaded configs
-
----@alias ConfigName string the name of a configuration defined by keys in main_config.config_types
----@alias ConfigKey string  a key corresponding to a given ConfigField defined in main_config.config_types[i]
----@alias ActionConfig { [ConfigName]: { [ConfigKey]: any } }
 
 ---@class ActionDescriptor
 ---@field desc string               the displayed discription of the action

@@ -19,6 +19,8 @@ return {
     actions = {
         cargo = require("director.action_groups.cargo"),
         cmake = require("director.action_groups.cmake"),
+
+        --[[
         ["file action"] = {
             file_local = true,
             detect = function()
@@ -110,5 +112,6 @@ return {
                 }
             },
         }
+        ]]
     },
 }

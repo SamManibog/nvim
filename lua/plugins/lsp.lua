@@ -3,10 +3,13 @@ return {
     dependencies = {
         "folke/lazydev.nvim",
         "williamboman/mason.nvim",
-        "williamboman/mason-lspconfig.nvim",
+        --"williamboman/mason-lspconfig.nvim",
     },
     lazy = false,
     config = function()
+        vim.lsp.set_log_level("trace")
+        --vim.lsp.set_log_level("off")
+
         vim.lsp.config("lua_ls", {
             filetypes = { "lua" },
             settings = {
@@ -18,8 +21,10 @@ return {
                 }
             }
         })
+        vim.lsp.enable("lua_ls")
 
         vim.lsp.config("rust_analyzer", {})
+        vim.lsp.enable("rust_analyzer")
 
         vim.lsp.config("clangd", {
             cmd = {
@@ -39,21 +44,31 @@ return {
                 "proto",
             }
         })
+        vim.lsp.enable("clangd")
 
         vim.lsp.config("omnisharp", {
             cmd = {
                 "dotnet",
-                vim.fn.stdpath("data") .. "/mason/packages/omnisharp/libexec/OmniSharp.dll"
+                vim.fn.stdpath("data") .. "/mason/packages/omnisharp/libexec/OmniSharp.dll",
+                "--languageserver"
             },
+            filetypes = { "cs" },
+            root_markers = { ".csproj" },
             enable_import_completion = true,
             organize_imports_on_format = true,
             enable_roslyn_analyzers = true,
-            root_dir = function()
-                return vim.loop.cwd() -- current working directory
-            end,
         })
+        vim.lsp.enable("omnisharp")
 
-        vim.lsp.config("wgsl_analyzer", {})
+        vim.lsp.config("omnisharp-mono", {
+            cmd = {
+                "omnisharp-mono",
+                "--languageserver",
+            },
+            filetypes = { "cs" },
+            root_markers = { ".csproj" },
+        })
+        --vim.lsp.enable("omnisharp-mono")
 
         require("mason").setup({
             ui = {
@@ -64,6 +79,6 @@ return {
                 }
             }
         })
-        require("mason-lspconfig").setup()
+        --require("mason-lspconfig").setup()
     end
 }

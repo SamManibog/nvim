@@ -1598,9 +1598,4 @@ function M.configMenu()
     end
 end
 
---TODO BUGS:
---
---TODO NEW FEATURES:
--- add ability to have prompt text for each action config field
-
 return M
