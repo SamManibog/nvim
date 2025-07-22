@@ -31,19 +31,19 @@
 ---@field custom_cmd (fun(any): string)?    used in utils.generateCommand
 
 ---@class DirectorBindsConfig
----@field up string[]?              a list of binds used to move cursor upwards in the menus
----@field down string[]?            a list of binds used to move cursor downwards in the menus
----@field select string[]?          a list of binds used to confirm a selection or edit a profile
----@field new string[]?             a list of binds used to create a new config profile
----@field rename string[]?          a list of binds used to rename profiles
----@field delete string[]?          a list of binds used to delete profiles
----@field edit string[]?            a list of binds used to edit a config profile
----@field cancel string[]?          a list of binds used to return to the previous menu (or close the menu)
----@field quick_menu string[]?      a list of binds used to list all actions with keybinds
----@field file_menu string[]?       a list of binds used to list all actions pertaining to the current file buffer
----@field directory_menu string[]?  a list of binds used to list all actions pertaining to the current working directory
----@field main_menu string[]?       a list of binds used to list all loaded actions
----@field config_menu string[]?     a list of binds used to list all loaded configs
+---@field up string|string[]?              a list of binds used to move cursor upwards in the menus
+---@field down string|string[]?            a list of binds used to move cursor downwards in the menus
+---@field select string|string[]?          a list of binds used to confirm a selection or edit a profile
+---@field new string|string[]?             a list of binds used to create a new config profile
+---@field rename string|string[]?          a list of binds used to rename profiles
+---@field delete string|string[]?          a list of binds used to delete profiles
+---@field edit string|string[]?            a list of binds used to edit a config profile
+---@field cancel string|string[]?          a list of binds used to return to the previous menu (or close the menu)
+---@field quick_menu string|string[]?      a list of binds used to list all actions with keybinds
+---@field file_menu string|string[]?       a list of binds used to list all actions pertaining to the current file buffer
+---@field directory_menu string|string[]?  a list of binds used to list all actions pertaining to the current working directory
+---@field main_menu string|string[]?       a list of binds used to list all loaded actions
+---@field config_menu string|string[]?     a list of binds used to list all loaded configs
 
 ---@class DirectorBindsConfigInternal
 ---@field up string[]           a list of binds used to move cursor upwards in the menus

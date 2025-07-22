@@ -10,6 +10,10 @@ require("director").setup({
         quick_menu = "<leader>b",
         main_menu = "<leader>mm",
         config_menu = "<leader>mc",
+    },
+    actions = {
+        cmake = require("director_configs.cmake"),
+        cargo = require("director_configs.cargo"),
     }
 })
 
