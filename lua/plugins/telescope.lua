@@ -6,8 +6,10 @@ return {
     lazy = false,
     config = function()
         local builtin = require('telescope.builtin')
-        vim.keymap.set('n', '<leader>pf', function()
-            local search_dir = nil
+
+        --setting search path
+        local search_dir = nil
+        do
             local first_file = vim.fn.argv()[1]
 
             if first_file ~= nil then
@@ -16,10 +18,20 @@ return {
                     search_dir = first_file
                 end
             end
+        end
 
+        --whether to set hidden flag (disable for windows)
+        ---@type boolean?
+        local hidden = true
+        if vim.fn.has("windows") then
+            hidden = nil
+        end
+
+        vim.keymap.set('n', '<leader>pf', function()
+            local dir = search_dir or vim.fn.getcwd()
             builtin.find_files({
-                cwd = search_dir,
-                hidden = true,
+                cwd = dir,
+                hidden = hidden,
             })
         end)
         vim.keymap.set('n', '<leader>pg', builtin.git_files, {})
