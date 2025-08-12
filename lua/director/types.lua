@@ -75,12 +75,12 @@
 ---@field priority number?              If keybinds conflict, the default priority of all actions in the group (default 0 for cwd actions, 100 for file actions)
 
 ---@class DirectorConfig
----@field preserve boolean?                     whether or not to save in-editor configuration to disk
+---@field disk_saves boolean?                     whether or not to save in-editor configuration to disk
 ---@field binds DirectorBindsConfig?            binds for menus
 ---@field actions table<groupName, ActionGroup> a list of action groups that may be used
 
 ---@class DirectorConfigInternal
----@field preserve boolean                      whether or not to save in-editor configuration to disk
+---@field disk_saves boolean                      whether or not to save in-editor configuration to disk
 ---@field binds DirectorBindsConfigInternal         binds for menus
 ---@field actions table<groupName, ActionGroup> a list of action groups that may be used
 ---@field cwd_actions table<groupName, ActionGroup> a list of action groups that may be used in the cwd

@@ -1188,7 +1188,7 @@ function M.setup(opts)
     ---@type DirectorConfigInternal
     main_config = opts or {} ---@diagnostic disable-line:assign-type-mismatch
     if main_config.actions == nil then main_config.actions = default.actions end
-    if main_config.preserve == nil then main_config.preserve = default.preserve end
+    if main_config.disk_saves == nil then main_config.disk_saves = default.disk_saves end
     if main_config.binds == nil then main_config.binds = {} end ---@diagnostic disable-line:missing-fields
     main_config.binds = vim.tbl_extend("keep", main_config.binds, default.binds)
 
@@ -1329,7 +1329,7 @@ function M.setup(opts)
 end
 
 function M.saveConfigs()
-    if main_config.preserve == false then return end
+    if main_config.disk_saves == false then return end
 
     for _, mod in ipairs(director_state.modified) do
         saveGroupConfig(mod.path, mod.group, mod.config)
@@ -1595,6 +1595,55 @@ function M.configMenu()
                 p:close()
             end)
         end
+    end
+end
+
+---Runs the action with the currently selected configs
+---@param group string the name of the action group the action belongs to
+---@param desc string the action description to search for
+---@param silent? boolean whether or not to disable the warning for when action could not be run
+function M.runAction(group, desc, silent)
+    local action_group = main_config.actions[group]
+    if action_group == nil then
+        if not silent then
+            print("Could not run action '"..desc.."' from group '"..group.."'; Group does not exist.")
+        end
+        return
+    end
+
+    ---@type ActionDescriptor
+    local action
+    for _, entry in pairs(action_group.actions) do
+        if entry.desc == desc then
+            action = entry
+            break
+        end
+    end
+    if action == nil then
+        if not silent then
+            print("Could not run action '"..desc.."' from group '"..group.."'; Action does not exist.")
+        end
+        return
+    end
+
+    ---@type string
+    local path
+    if action_group.file_local then
+        path = director_state.file
+    else
+        path = getcwd()
+    end
+    if path == nil then
+        if not silent then
+            print("Could not run action '"..desc.."' from group '"..group.."'; File/Directory scope not found.")
+        end
+        return
+    end
+
+    if action.configs == nil or #action.configs <= 0 then
+        action.callback()
+    else
+        action.callback(getActionConfigs(path, group, action.configs))
     end
 end
 

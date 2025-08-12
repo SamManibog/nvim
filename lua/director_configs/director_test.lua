@@ -1,16 +1,16 @@
 return {
     file_local = true,
     detect = function()
-        return vim.fn.expand("%:p:e") == "cpp"
+        return vim.fn.expand("%:p:e") == "lua"
     end,
     actions = {
         {
             bind = "cc",
-            desc = "cpp Hi Bound",
+            desc = "lua Hi Bound",
             callback = function() print("Hi (bound)") end
         },
         {
-            desc = "cpp Hi",
+            desc = "lua Hi",
             callback = function() print("Hi") end
         },
         {

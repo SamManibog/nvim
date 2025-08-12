@@ -104,6 +104,93 @@ function M.generateCommand(head, config, fields)
     return cmd
 end
 
+---creates a directory at the given path if it doesn't already exist
+---(convenient as vim function throws an error if directory exists)
+---@param path string the path at which to make the directory (no parents created)
+function M.mkdir(path)
+    if vim.fn.isdirectory(path) ~= 1 then
+        vim.uv.fs_mkdir(path, tonumber("777", 8))
+    end
+end
+
+---gets a list of all files or directories that satisfy the given function, searching recursively from the given path
+---@param path string the path from which to start the search
+---@param detect fun(path: string): boolean the function used to detect if a path should be listed
+---@param whitelist? fun(path: string): boolean the function used to detect if a given directory should be included in the search
+---@param depth? integer the maximum depth to search for files a depth of 0 means only the given path will be searched
+---@param count? integer the maximum number of entries to return
+---@return string[]
+function M.listFiles(path, detect, whitelist, depth, count)
+    if count == nil then count = math.huge end
+    if depth == nil then depth = math.huge end
+    if whitelist == nil then whitelist = function(_) return true end end
+    if path:sub(-1):match("[/\\]") then path = path:sub(0, -2) end
+
+    ---@type string[]
+    local queue1 = {}
+
+    ---@type string[]
+    local queue2 = {}
+
+    ---@type string[]
+    local out = {}
+
+    ---@type integer
+    local out_size = 0
+
+    ---@type integer
+    local search_depth = 1
+
+    if depth >= 0 and count > 0 then
+        local fs = vim.uv.fs_scandir(path)
+
+        if fs == nil then error("'"..path.."' is not a directory.") end
+
+        for name, type in function() return vim.uv.fs_scandir_next(fs) end do
+            local full_path = path.."/"..name
+            if type == "directory" and whitelist(full_path) then
+                table.insert(queue1, "/"..name)
+            end
+            if detect(full_path) then
+                table.insert(out, "/"..name)
+                out_size = out_size + 1
+                if out_size >= count then return out end
+            end
+        end
+    else
+        return out
+    end
+
+    while #queue1 > 0 and search_depth <= depth do
+        while #queue1 > 0 do
+            local rel_path = queue1[#queue1]
+            local fs = vim.uv.fs_scandir(path..rel_path)
+            queue1[#queue1] = nil
+
+            if fs == nil then error("'"..path.."' is not a directory.") end
+
+            for name, type in function() return vim.uv.fs_scandir_next(fs) end do
+                local full_path = path..rel_path.."/"..name
+                if type == "directory" and whitelist(full_path) then
+                    table.insert(queue2, rel_path.."/"..name)
+                end
+                if detect(full_path) then
+                    table.insert(out, rel_path.."/"..name)
+                    out_size = out_size + 1
+                    if out_size >= count then return out end
+                end
+            end
+        end
+
+        search_depth = search_depth + 1
+
+        queue1 = queue2
+        queue2 = {}
+    end
+
+    return out
+end
+
 ---@type number?
 local term_job
 
@@ -181,92 +268,6 @@ function M.toggleTerminal()
     else
         M.openTerminal()
     end
-end
-
----creates a directory at the given path if it doesn't already exist
----(convenient as vim function throws an error if directory exists)
----@param path string the path at which to make the directory (no parents created)
-function M.mkdir(path)
-    if vim.fn.isdirectory(path) ~= 1 then
-        vim.uv.fs_mkdir(path, tonumber("777", 8))
-    end
-end
-
----gets a list of all files or directories that satisfy the given function, searching recursively from the given path
----@param path string the path from which to start the search
----@param detect fun(path: string): boolean the function used to detect if a path should be listed
----@param whitelist? fun(path: string): boolean the function used to detect if a given directory should be included in the search
----@param depth? integer the maximum depth to search for files a depth of 0 means only the given path will be searched
----@param count? integer the maximum number of entries to return
-function M.listFiles(path, detect, whitelist, depth, count)
-    if count == nil then count = math.huge end
-    if depth == nil then depth = math.huge end
-    if whitelist == nil then whitelist = function(_) return true end end
-    if path:sub(-1):match("[/\\]") then path = path:sub(0, -2) end
-
-    ---@type string[]
-    local queue1 = {}
-
-    ---@type string[]
-    local queue2 = {}
-
-    ---@type string[]
-    local out = {}
-
-    ---@type integer
-    local out_size = 0
-
-    ---@type integer
-    local search_depth = 1
-
-    if depth >= 0 and count > 0 then
-        local fs = vim.uv.fs_scandir(path)
-
-        if fs == nil then error("'"..path.."' is not a directory.") end
-
-        for name, type in function() return vim.uv.fs_scandir_next(fs) end do
-            local full_path = path.."/"..name
-            if type == "directory" and whitelist(full_path) then
-                table.insert(queue1, "/"..name)
-            end
-            if detect(full_path) then
-                table.insert(out, "/"..name)
-                out_size = out_size + 1
-                if out_size >= count then return out end
-            end
-        end
-    else
-        return out
-    end
-
-    while #queue1 > 0 and search_depth <= depth do
-        while #queue1 > 0 do
-            local rel_path = queue1[#queue1]
-            local fs = vim.uv.fs_scandir(path..rel_path)
-            queue1[#queue1] = nil
-
-            if fs == nil then error("'"..path.."' is not a directory.") end
-
-            for name, type in function() return vim.uv.fs_scandir_next(fs) end do
-                local full_path = path..rel_path.."/"..name
-                if type == "directory" and whitelist(full_path) then
-                    table.insert(queue2, rel_path.."/"..name)
-                end
-                if detect(full_path) then
-                    table.insert(out, rel_path.."/"..name)
-                    out_size = out_size + 1
-                    if out_size >= count then return out end
-                end
-            end
-        end
-
-        search_depth = search_depth + 1
-
-        queue1 = queue2
-        queue2 = {}
-    end
-
-    return out
 end
 
 return M

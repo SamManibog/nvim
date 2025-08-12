@@ -1,6 +1,6 @@
 ---@type DirectorConfig
 return {
-    preserve = true,
+    disk_saves = true,
     binds = {
         new =               { "o", "O", "n", "N" },
         rename =            { "r", "R" },
