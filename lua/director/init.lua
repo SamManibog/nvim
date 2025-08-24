@@ -883,7 +883,10 @@ configProfileEditor = function(path, group, config, profile)
                 if field.type == "list" then
                     local out = {}
                     for _, entry in ipairs(value) do
-                        table.insert(out, Line("\""..tostring(entry).."\"", { hl_group = "String" }))
+                        table.insert(out, Line({
+                            Text("\""..tostring(entry).."\"", { hl_group = "String" }),
+                            Text(",", { hl_group = "Operator" })
+                        }))
                     end
                     return out
                 else
@@ -1273,17 +1276,6 @@ function M.setup(opts)
             callback = function()
                 M.saveConfigs()
             end
-        }
-    )
-
-    vim.api.nvim_create_user_command(
-        "DirectorSave",
-        function (_)
-            M.saveConfigs()
-        end,
-        {
-            nargs = 0,
-            desc = "Saves all changes made on director configurations",
         }
     )
 

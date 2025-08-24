@@ -2,7 +2,8 @@ return {
     'saghen/blink.cmp',
     dependencies = {
         "folke/lazydev.nvim",
-        'rafamadriz/friendly-snippets'
+        --'rafamadriz/friendly-snippets',
+        "L3MON4D3/LuaSnip",
     },
 
     -- use a release tag to download pre-built binaries
@@ -24,6 +25,8 @@ return {
         },
 
         completion = { documentation = { auto_show = true } },
+
+        snippets = { preset = "luasnip" },
 
         sources = {
             default = { "lazydev", "lsp", "path", "snippets", "buffer" },
