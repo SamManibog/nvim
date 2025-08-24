@@ -5,8 +5,6 @@ return {
     config = function()
         local ls = require("luasnip")
         require("luasnip.loaders.from_vscode").lazy_load()
-        --require("luasnip.loaders.from_lua").load({ paths = vim.fn.stdpath("config").."/snippets" })
-        --require("luasnip.loaders.from_lua").load({ paths = "~/snippets" })
         require("luasnip.loaders.from_lua").load({ paths = vim.fn.stdpath("config").."/lua/snippets" })
 
         --expand or jump with tab
