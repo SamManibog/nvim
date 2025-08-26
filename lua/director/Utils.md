@@ -69,4 +69,3 @@ If the terminal has not been previously opened, a new terminal is created first 
 
 If the current buffer is Director's terminal buffer, closes the associated window,
 otherwise opens a possibly new terminal via openTerminal().
-
