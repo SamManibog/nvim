@@ -116,6 +116,7 @@ local config_types = {
             name = "Verbose",
             type = "boolean",
             default = false,
+            arg_prefix = "-v",
             bool_display = true
         },
         {

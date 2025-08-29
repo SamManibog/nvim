@@ -182,6 +182,5 @@ are optional.
 - arg_prefix (`string`) - When defined, the string used to prefix the field's value. Note that a space is automatically inserted before each new field.
 - arg_postfix (`string`) - When defined, the string used to postfix the field's value.
 - list_affix (`boolean`) - When true, every element in the list will be surrounded by arg_prefix/postfix. Otherwise, arg_prefix and postfix surround all list entries.
-- show_empty (`boolean`) - When true, if the field's value is an empty string, the prefix and postfix will still be added to the command.
-- bool_display (`boolean`) - When the field's value is `true`, acts like show_empty.
+- bool_display (`boolean`) - When non nil and the field's value is a boolean, adds arg_prefix to the command when the field's value and this value match.
 - custom_cmd (`fun(any): string`) - If defined, the field's value is passed to the function before being added to the list. Note that arg_prefix/postfix will surround the return value.

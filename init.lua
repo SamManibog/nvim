@@ -6,6 +6,7 @@ require("config.diagnostic")
 
 require("config.propicker")
 require("director").setup({
+    disk_saves = true,
     binds = {
         quick_menu = "<leader>b",
         main_menu = "<leader>mm",

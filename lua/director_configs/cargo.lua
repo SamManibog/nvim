@@ -3,7 +3,7 @@ local utils = require("director.utils")
 ---@type ActionGroup
 return {
     detect = function()
-        return vim.fn.filereadable(vim.fn.getcwd().. "/Cargo.toml") == 1
+        return vim.fn.filereadable(vim.fn.getcwd().."/Cargo.toml") == 1
     end,
     actions = {
         {
