@@ -38,7 +38,7 @@ local config_types = {
             name = "Preset",
             type = "string",
             default = "debug",
-            arg_prefix = "preset="
+            arg_prefix = "preset=",
         },
         {
             name = "Generator",
@@ -104,7 +104,8 @@ local config_types = {
             name = "Targets",
             type = "list",
             default = {},
-            arg_prefix = "-t"
+            arg_prefix = "-t",
+            omit_default = true,
         },
         {
             name = "Clean First",
