@@ -187,7 +187,7 @@ Also, multiple ConfigTypes may be accessed by an action, and ConfigTypes may als
 
 ConfigFields may be accessed using their exact name from their corresponding ConfigField as pictured above.
 
-## Command Generation Basics
+## Command Generation Part 1
 
 Often, actions will be used to run a command from the terminal, and their included ConfigTypes may be very long,
 making it tedious to implement command creation functions such as the one in the previous section. Again, Director's
@@ -248,20 +248,23 @@ local config_types = {
             name = "Release",
             type = "boolean",
             default = false,
-            arg_prefix = "-r",
+            arg_prefix = "-r ",
             bool_display = true, -- Display arg_prefix only when Release is true
         },
         {
             name = "Features",
             type = "list",
             default = {},
-            arg_prefix = "-f" -- Prefix the list of features with -f
+            arg_prefix = "-f " -- Prefix the list of features with -f
         },
     },
 }
 ```
 
 Our action will now work as intended.
+
+Note that you may also specify `arg_postfix`. Also note that there is a space after -r and -f. This is because `arg_prefix`
+and `arg_postfix` are concatenated *directly* before and after the field's value.
 
 There are a myriad of other fields in a ConfigField that can be used to work with `generateCommand()`, but fear not; we will
 go through examples with each of them. But first, let me introduce you to a new ConfigField type.
@@ -309,4 +312,85 @@ or a function that returns a list of strings.
 `omit_default` is another field that interacts with `generateCommand()`. Whenever the config's value matches
 the default value, the associated flag is not added to the generated command.
 
-end
+## Command Generation Part 2
+
+In this section we will now cover the last three ConfigField options, all of which are used by `generateCommand()`.
+
+The first is straight forward: `cmd_omit`. When this field is set to true, it the ConfigField will be ignored completely
+when generating the command. It can be used simply as follows:
+
+```lua
+{
+    name = "Field I Don't Want in my Command",
+    type = "string",
+    default = "",
+    cmd_omit = true,
+}
+```
+
+When you have a list field, you may run into the problem where rather than have one flag (`arg_prefix` and/or `arg_postfix`)
+to denote the entire list, you might need to provide `arg_prefix` or `arg_postfix` for each list item. This problem is solved
+by the `list_affix` field. Just set it to true and `arg_prefix` and `arg_postfix` will surround each list item. In-keeping
+with our previous examples using Cargo, we can use this field for the `--test` build flag.
+
+```lua
+{
+    name = "Tests",
+    type = "list",
+    default = {},
+    arg_prefix = "--test",
+    list_affix = true,
+}
+```
+
+So if the value of the associated field was `{"test1", "test2", "test3"}`, the output generated would be
+`..."--test test1 --test test2 --test test3"...`
+
+Alright, that's great and all, what if you have a very specific problem that Director can't solve? Well, then you can
+fix it... easily. If all else fails, Director provides the `custom_cmd` field to handle such cases. Simply provide a
+function that takes the input directly and converts it into a string. Note that providing this field will override all
+other fields.
+
+```lua
+{
+    name = "My Custom Field",
+    type = "string",
+    default = "",
+    custom_cmd = function(value)
+        local output
+    	... -- Do something to output.
+        return tostring(output) -- Make sure it returns a string!
+    end
+}
+```
+
+## Input Validation
+
+There is one last thing to cover before you can become a Director expert. I'm sure you can relate to trying to run your code
+and some external issue arrises. Perhaps you entered a command incorrectly or maybe your API key expired.
+Director can't fix the latter (though I wish it could), but it can definitely help with the former using input validation.
+
+Input validation in ConfigFields is accomplished through the `validate` callback which takes a raw input value and
+returns false to reject the value or true to accept and save it.
+
+Lets use input validation to ensure that we enter a positive integer (no decimal values) value for the Cargo's
+concurrent jobs flag.
+
+```lua
+{
+    name = "Jobs",
+    type = "number",
+    default = 1,
+    arg_prefix = "-j ",
+    validate = function(jobs)
+        local is_valid = math.floor(jobs) == jobs and jobs > 0
+        if ~is_valid then
+            print("Value must be a non-negative integer.")
+        end
+        return is_valid
+    end
+}
+```
+
+We have now covered all facets of configuring Director. Congratulations on getting here! I truly hope this helps with your
+Neovim configuration. Happy Coding!

@@ -20,3 +20,4 @@ require("director").setup({
 
 -- Set colorscheme
 vim.cmd.colorscheme("gruvbox")
+

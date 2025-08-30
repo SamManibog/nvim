@@ -45,6 +45,19 @@ return {
         })
         vim.lsp.enable("clangd")
 
+        vim.lsp.config("tsserver", {
+            cmd = {
+                "typescript-language-server",
+                "--stdio",
+            },
+            filetypes = {
+                "typescript",
+                "typescriptreact",
+                "typescript.tsx"
+            }
+        })
+        vim.lsp.enable("tsserver")
+
         vim.lsp.config("omnisharp", {
             cmd = {
                 "dotnet",
@@ -53,9 +66,11 @@ return {
             },
             filetypes = { "cs" },
             root_markers = { ".csproj" },
+            --[[
             enable_import_completion = true,
             organize_imports_on_format = true,
             enable_roslyn_analyzers = true,
+            ]]
         })
         vim.lsp.enable("omnisharp")
 
