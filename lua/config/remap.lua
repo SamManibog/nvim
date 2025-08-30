@@ -1,8 +1,10 @@
 vim.g.mapleader = " "
+
 vim.keymap.set("n", "<leader>pv", function()
     vim.cmd("tab new")
     vim.cmd.Explore()
-end, { desc = "Open file explorer" })
+end, { desc = "Open file explorer in new tab" })
+vim.keymap.set("n", "<leader>pV", vim.cmd.Explore, { desc = "Open file explorer" })
 
 --move line
 vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv", { desc = "Move selection down" })
