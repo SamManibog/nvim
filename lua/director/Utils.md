@@ -49,7 +49,7 @@ same terminal.
 *return (boolean):* Returns true if a new terminal buffer was created. Returns false if
 the terminal buffer already exists.
 
-## forceKillTerminal(name)
+### forceKillTerminal(name)
 
 Kills the terminal buffer created by a call to openTerminal(). Calling openTerminal() again
 will open a new terminal buffer.
@@ -67,7 +67,7 @@ Note that the buffer may be active without being visisble on any window.
 
 *return (boolean):* Returns true if Director's terminal buffer exists and false otherwise.
 
-### runInTerminal(cmd, name)
+### runInTerminal(cmd, name, silent)
 
 Stops the current job running in the specified terminal buffer, and runs a new job.
 If the terminal has not been previously opened, a new terminal is created first via openTerminal().
@@ -75,6 +75,7 @@ If the terminal has not been previously opened, a new terminal is created first 
 *Parameters:*
 - `string` cmd - The command to run in the terminal.
 - `string` name - The name of the terminal to run the command in. Defaults to `"default"`.
+- `boolean` silent - An optional parameter that when set to true will not open a window with the given terminal. In essence, it will run the command in the background.
 
 ### toggleTerminal(name)
 

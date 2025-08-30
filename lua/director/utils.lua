@@ -185,6 +185,29 @@ end
 ---@type table<string, { buffer: number, job: number }>
 local terminals = {}
 
+---@param name string allocate a terminal in the terminals variable
+---@return number buffer the id of the terminal's buffer
+local function allocateTerminal(name)
+    if terminals[name] ~= nil then return terminals[name].buffer end
+
+    local term = { buffer = vim.api.nvim_create_buf(true, false) }
+    vim.api.nvim_buf_call(term.buffer, vim.cmd.terminal)
+    term.job = vim.api.nvim_get_option_value("channel", { buf = term.buffer })
+
+    vim.api.nvim_create_autocmd("BufWipeout", {
+        group = vim.api.nvim_create_augroup("director-terminal", { clear = true}),
+        buffer = term.job,
+        callback = function()
+            print("Terminal '"..name.."' killed.")
+            terminals[name] = nil
+        end
+    })
+
+    terminals[name] = term
+
+    return term.buffer
+end
+
 ---@param name? string the name of the terminal to check if it is opened
 ---@return boolean
 function M.terminalIsOpen(name)
@@ -230,34 +253,41 @@ function M.openTerminal(name)
         end
         return false
     else
-        print("new terminal: "..name)
-        vim.cmd.vnew()
-        vim.cmd.terminal()
-        local term = { job = vim.bo.channel, buffer = vim.fn.bufnr("%") }
-        vim.api.nvim_create_autocmd("BufWipeout", {
-            group = vim.api.nvim_create_augroup("director-terminal", { clear = true}),
-            buffer = term.job,
-            callback = function()
-                print("term killed")
-                terminals[name] = nil
+        -- Find non-floating window
+        local split_win = 0
+        if vim.api.nvim_win_get_config(0).relative ~= nil then
+            local wins = vim.api.nvim_tabpage_list_wins(0)
+            for _, win_id in ipairs(wins) do
+                if vim.api.nvim_win_get_config(win_id).relative ~= nil then
+                    split_win = win_id
+                    break;
+                end
             end
-        })
-        terminals[name] = term
+        end
+
+        vim.api.nvim_open_win(allocateTerminal(name), true, { split = "below", win = split_win })
         vim.cmd.wincmd("J")
         vim.cmd.startinsert()
+
         return true
     end
 end
 
 ---@param name? string the name of the terminal to open
 ---@param cmd string the command to run in the terminal
-function M.runInTerminal(cmd, name)
+---@param silent? boolean if true, the command will be run in the terminal without opening it
+function M.runInTerminal(cmd, name, silent)
     name = name or "default"
-    local term = terminals[name]
-    if not M.openTerminal(name) then
-        vim.fn.chansend(term.job, "\3") ---@diagnostic disable-line:param-type-mismatch openTerminal function guarantees term_job is non-nil
+    if silent then
+        allocateTerminal(name)
+    else
+        if not M.openTerminal(name) then
+            local term = terminals[name]
+            vim.fn.chansend(term.job, "\3") ---@diagnostic disable-line:param-type-mismatch openTerminal function guarantees term_job is non-nil
+        end
     end
 
+    local term = terminals[name]
     vim.fn.chansend(term.job, { cmd, "" }) ---@diagnostic disable-line:param-type-mismatch
 end
 

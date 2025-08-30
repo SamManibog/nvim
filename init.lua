@@ -15,6 +15,7 @@ require("director").setup({
     actions = {
         cmake = require("director_configs.cmake"),
         cargo = require("director_configs.cargo"),
+        typescript = require("director_configs.typescript"),
     }
 })
 
