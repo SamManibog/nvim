@@ -54,7 +54,8 @@ return {
                 "typescript",
                 "typescriptreact",
                 "typescript.tsx"
-            }
+            },
+            root_markers = { "tsconfig.json" },
         })
         vim.lsp.enable("tsserver")
 
