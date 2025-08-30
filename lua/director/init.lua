@@ -1284,12 +1284,15 @@ function M.setup(opts)
         "Director",
         function (cmd)
             local help ="Director command can be run with the following arguments:"
-            .."\t    (q)uick - to list all commands with keybinds"
-            .."\t     (m)ain - to list all loaded commands"
-            .."\t(d)irectory - to list all working directory commands"
-            .."\t     (f)ile - to list all file commands"
-            .."\t   (c)onfig - to open the configuration menu"
-            .."\t     (s)ave - to force save all configuration changes"
+            .."\n\t q) - to list all commands with keybinds"
+            .."\n\t m) - to list all loaded commands"
+            .."\n\t d) - to list all working directory commands"
+            .."\n\t f) - to list all file commands"
+            .."\n\t c) - to open the configuration menu"
+            .."\n\t s) - to force save all configuration changes"
+            .."\n\trf) - to force reload all file actions"
+            .."\n\trd) - to force reload all directory actions"
+            .."\n\trr) - to force reload all actions"
 
             if cmd.fargs[1] == nil then
                 print(help)
@@ -1309,6 +1312,25 @@ function M.setup(opts)
                 M.configMenu()
             elseif arg == "s" then
                 M.saveConfigs()
+            elseif arg == "r" then
+                local arg2 = string.lower(string.sub(cmd.fargs[1], 2, 2))
+                if arg2 == "f" then
+                    M.saveConfigs()
+                    file_actions = {}
+                    file_bind_info = {}
+                    M.loadFileActions()
+                    print("Reloaded File Actions")
+                elseif arg2 == "d" then
+                    M.refreshCwdActions()
+                    print("Reloaded Directory Actions")
+                elseif arg2 == "r" then
+                    M.refreshCwdActions()
+                    file_actions = {}
+                    file_bind_info = {}
+                    print("Reloaded All Actions")
+                else
+                    print(help)
+                end
             else
                 print(help)
             end
@@ -1323,12 +1345,19 @@ end
 function M.saveConfigs()
     if main_config.disk_saves == false then return end
 
+    local message = #director_state.modified > 0
+
     for _, mod in ipairs(director_state.modified) do
         saveGroupConfig(mod.path, mod.group, mod.config)
     end
     for _, mod in ipairs(director_state.modified) do
         attemptClean(mod.path, mod.group, mod.config)
     end
+
+    if message then
+        print("Configs Saved.")
+    end
+
     director_state.modified = {}
 end
 

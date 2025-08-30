@@ -80,9 +80,12 @@ lines. You can save your changes sing the write command (*:w*). Closing the menu
 
 Director defines one user command *Director* which can be used to open any Director menu.
 The command can be run with any of the following arguments:
-- (m)ain - To open the main menu
-- (q)uick - To open the quick menu
-- (d)irectory - To open the directory menu
-- (f)ile - To open the file menu
-- (c)onfig - To open the configuration menu
-- (s)ave - To save all edited configs (the disk_saves option must be enabled)
+-  (q) - to list all commands with keybinds
+-  (m) - to list all loaded commands
+-  (d) - to list all working directory commands
+-  (f) - to list all file commands
+-  (c) - to open the configuration menu
+-  (s) - to force save all configuration changes
+- (rf) - to force reload all file actions
+- (rd) - to force reload all directory actions
+- (rr) - to force reload all actions
