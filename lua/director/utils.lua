@@ -182,32 +182,37 @@ function M.listFiles(path, detect, whitelist, depth, count)
     return out
 end
 
----@type number?
-local term_job
+---@type table<string, { buffer: number, job: number }>
+local terminals = {}
 
----@type number?
-local term_job_buffer
-
+---@param name? string the name of the terminal to check if it is opened
 ---@return boolean
-function M.terminalIsOpen()
-    return term_job ~= nil and term_job_buffer ~= nil
+function M.terminalIsOpen(name)
+    name = name or "default"
+    local term = terminals[name]
+    return term ~= nil
 end
 
-function M.forceKillTerminal()
-    if term_job ~= nil then
-        vim.fn.jobstop(term_job)
-    end
-    term_job = nil
-    term_job_buffer = nil
+---@param name? string the name of the terminal to kill
+function M.forceKillTerminal(name)
+    name = name or "default"
+    local term = terminals[name]
+    if term == nil then return end
+    vim.fn.jobstop(term.job)
+    terminals[name] = nil
 end
 
+---@param name? string the name of the terminal to open
 ---@return boolean new_created returns true if a new terminal buffer was created and false otherwise
-function M.openTerminal()
-    if M.terminalIsOpen() then
-        if vim.fn.bufnr ~= term_job_buffer then
+function M.openTerminal(name)
+    name = name or "default"
+    if M.terminalIsOpen(name) then
+        local term = terminals[name]
+        -- If terminal is open somewhere else in the window, focus it
+        if vim.fn.bufnr ~= term.buffer then
             local wins = vim.api.nvim_tabpage_list_wins(0)
             for _, win_id in ipairs(wins) do
-                if vim.api.nvim_win_get_buf(win_id) == term_job_buffer then
+                if vim.api.nvim_win_get_buf(win_id) == term.buffer then
                     vim.api.nvim_tabpage_set_win(0, win_id)
                     vim.cmd.wincmd("J")
                     vim.cmd.startinsert()
@@ -215,49 +220,56 @@ function M.openTerminal()
                 end
             end
             vim.cmd.vnew()
-            vim.cmd.buffer(term_job_buffer)
+            vim.cmd.buffer(term.buffer)
             vim.cmd.wincmd("J")
         end
+
+        -- Begin inserting to terminal
         if vim.fn.mode() ~= "t" then
             vim.cmd.startinsert()
         end
         return false
     else
+        print("new terminal: "..name)
         vim.cmd.vnew()
         vim.cmd.terminal()
-        term_job = vim.bo.channel
-        term_job_buffer = vim.fn.bufnr("%")
+        local term = { job = vim.bo.channel, buffer = vim.fn.bufnr("%") }
         vim.api.nvim_create_autocmd("BufWipeout", {
             group = vim.api.nvim_create_augroup("director-terminal", { clear = true}),
-            buffer = term_job,
+            buffer = term.job,
             callback = function()
                 print("term killed")
-                term_job = nil
-                term_job_buffer = nil
+                terminals[name] = nil
             end
         })
+        terminals[name] = term
         vim.cmd.wincmd("J")
         vim.cmd.startinsert()
         return true
     end
 end
 
+---@param name? string the name of the terminal to open
 ---@param cmd string the command to run in the terminal
-function M.runInTerminal(cmd)
-    if not M.openTerminal() then
-        vim.fn.chansend(term_job, "\3") ---@diagnostic disable-line:param-type-mismatch openTerminal function guarantees term_job is non-nil
+function M.runInTerminal(cmd, name)
+    name = name or "default"
+    local term = terminals[name]
+    if not M.openTerminal(name) then
+        vim.fn.chansend(term.job, "\3") ---@diagnostic disable-line:param-type-mismatch openTerminal function guarantees term_job is non-nil
     end
 
-    vim.fn.chansend(term_job, { cmd, "" }) ---@diagnostic disable-line:param-type-mismatch
+    vim.fn.chansend(term.job, { cmd, "" }) ---@diagnostic disable-line:param-type-mismatch
 end
 
----closes the terminal if currently on the terminal
----opens the terminal if not on the terminal
-function M.toggleTerminal()
-    if vim.fn.bufnr() == term_job_buffer then
+---closes the terminal if currently on ANY terminal
+---opens the terminal if not on a terminal
+---@param name? string the name of the terminal to open
+function M.toggleTerminal(name)
+    if vim.api.nvim_get_option_value("buftype", { buf = vim.fn.bufnr() }) == "terminal" then
         vim.cmd.quit()
     else
-        M.openTerminal()
+        name = name or "default"
+        M.openTerminal(name)
     end
 end
 

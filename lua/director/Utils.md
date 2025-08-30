@@ -37,35 +37,49 @@ Lists the paths of all files and directories satisfying the given callback using
 
 *return (`string[]`):* A list of files satisfying the detect function.
 
-### openTerminal() -> boolean
+### openTerminal(name) -> boolean
 
 Opens a terminal buffer split from the bottom of the current window. This terminal buffer
-is not deleted automatically, and calling openTerminal() again will open the same terminal.
+is not deleted automatically, so calling openTerminal() with the same name argument will open the
+same terminal.
+
+*Parameters:*
+- `string` name - The name of the associated terminal. Defaults to `"default"`.
 
 *return (boolean):* Returns true if a new terminal buffer was created. Returns false if
 the terminal buffer already exists.
 
-## forceKillTerminal()
+## forceKillTerminal(name)
 
 Kills the terminal buffer created by a call to openTerminal(). Calling openTerminal() again
-will open a different, clean terminal buffer.
+will open a new terminal buffer.
 
-### terminalIsOpen() -> boolean
+*Parameters:*
+- `string` name - The name of the terminal to kill. Defaults to `"default"`.
+
+### terminalIsOpen(name) -> boolean
 
 Checks if the terminal buffer created by calling openTerminal() is active.
 Note that the buffer may be active without being visisble on any window.
 
+*Parameters:*
+- `string` name - The name of the terminal to check. Defaults to `"default"`.
+
 *return (boolean):* Returns true if Director's terminal buffer exists and false otherwise.
 
-### runInTerminal(cmd)
+### runInTerminal(cmd, name)
 
-Stops the current job running in Director's terminal buffer, and runs a new job.
+Stops the current job running in the specified terminal buffer, and runs a new job.
 If the terminal has not been previously opened, a new terminal is created first via openTerminal().
 
 *Parameters:*
 - `string` cmd - The command to run in the terminal.
+- `string` name - The name of the terminal to run the command in. Defaults to `"default"`.
 
-### toggleTerminal
+### toggleTerminal(name)
 
-If the current buffer is Director's terminal buffer, closes the associated window,
-otherwise opens a possibly new terminal via openTerminal().
+If the current buffer is ANY terminal buffer, closes the associated window,
+otherwise opens a possibly new terminal with the associated name via openTerminal().
+
+*Parameters:*
+- `string` name - The name of the terminal to possibly open. Defaults to `"default"`.

@@ -1,7 +1,7 @@
 vim.g.mapleader = " "
 
 vim.keymap.set("n", "<leader>pv", function()
-    vim.cmd("tab new")
+    vim.cmd("tab split")
     vim.cmd.Explore()
 end, { desc = "Open file explorer in new tab" })
 vim.keymap.set("n", "<leader>pV", vim.cmd.Explore, { desc = "Open file explorer" })
