@@ -132,11 +132,11 @@ local config_types = {
             type = "number",
             default = 0,
             validate = function(num)
-                local out = math.floor(num) == num and num >= 0
-                if out == false then
+                local is_valid = math.floor(num) == num and num >= 0
+                if not is_valid then
                     print("Value must be a non-negative integer. 0 signifies use of native default.")
                 end
-                return out
+                return is_valid
             end,
             omit_default = true,
             arg_prefix = "-j "
