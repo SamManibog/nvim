@@ -14,6 +14,7 @@ return {
                 cmake = require("directorconf.cmake"),
                 cargo = require("directorconf.cargo"),
                 typescript = require("directorconf.typescript"),
+                globals = require("directorconf.global"),
             }
         })
     end

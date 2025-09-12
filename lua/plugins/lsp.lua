@@ -85,6 +85,30 @@ return {
         })
         --vim.lsp.enable("omnisharp-mono")
 
+        vim.lsp.config("eslint", {
+            cmd = {
+                "vscode-eslint-language-server",
+                "--stdio"
+            },
+            filetypes = {
+                "typescript",
+                "typescriptreact",
+                "typescript.tsx",
+                "javascript",
+                "javascriptreact",
+                "javascript.jsx",
+            },
+            root_markers = {
+                "eslint.config.js",
+                "eslint.config.mjs",
+                "eslint.config.cjs",
+                "eslint.config.ts",
+                "eslint.config.mts",
+                "eslint.config.cts",
+            }
+        })
+        vim.lsp.enable("eslint")
+
         require("mason").setup({
             ui = {
                 icons = {
