@@ -23,6 +23,9 @@ return {
         vim.lsp.enable("lua_ls")
 
         vim.lsp.config("rust-analyzer", {
+            cmd	= { "rust-analyzer" },
+            filetypes = { "rust" },
+            root_markers = { "Cargo.lock", "Cargo.toml" },
             settings = {
                 ["rust-analyzer"] = {
                 }
