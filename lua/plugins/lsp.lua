@@ -22,8 +22,13 @@ return {
         })
         vim.lsp.enable("lua_ls")
 
-        vim.lsp.config("rust_analyzer", {})
-        vim.lsp.enable("rust_analyzer")
+        vim.lsp.config("rust-analyzer", {
+            settings = {
+                ["rust-analyzer"] = {
+                }
+            }
+        })
+        vim.lsp.enable("rust-analyzer")
 
         vim.lsp.config("clangd", {
             cmd = {
