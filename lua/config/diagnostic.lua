@@ -22,6 +22,14 @@ vim.api.nvim_create_autocmd("ModeChanged",
     }
 )
 
+-- reset diagnostics and tree sitter
+vim.keymap.set("n", "<leader><leader>d", function()
+    vim.diagnostic.reset()
+    vim.treesitter.stop()
+    vim.treesitter.start()
+end)
+
+-- toggle in-line diagnostics
 vim.keymap.set("n", "<leader>d", function()
     if showing then
         vim.diagnostic.hide()
