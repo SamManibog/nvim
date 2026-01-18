@@ -38,12 +38,12 @@ local config_types = {
             name = "Preset",
             type = "string",
             default = "debug",
-            arg_prefix = "preset=",
+            arg_prefix = "--preset=",
         },
         {
             name = "Generator",
             type = "string",
-            default = "MinGW Makefiles",
+            default = '"MinGW Makefiles"',
             arg_prefix = "-G "
         },
         {
@@ -350,7 +350,7 @@ return {
                     "cmake",
                     configs.initialize,
                     config_types.initialize
-                ))
+                ) .. "-B build -S .")
             end
         },
         {
