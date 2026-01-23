@@ -35,6 +35,19 @@ vim.keymap.set({"n"}, "<leader><C-s>", function()
 end, { desc = "Open terminal in new tab"})
 vim.keymap.set({"n", "t"}, "<leader><leader><C-s>", dir_utils.forceKillTerminal, { desc = "Kill terminal" })
 
+--quick toggle "special" (shells)
+for t = 1, 9 do
+    local name = tostring(t)
+
+    vim.keymap.set({"n"}, "<leader>s"..name, function()
+        dir_utils.openTerminal(name)
+    end, { desc = "Open terminal "..name.." in new tab"})
+
+    vim.keymap.set({"n", "t"}, "<leader><leader>s"..name, function()
+        dir_utils.forceKillTerminal(name)
+    end, { desc = "Kill terminal " })
+end
+
 --tab navigation
 vim.keymap.set("n", "<leader>t", [[<cmd>tab split<CR>]], { desc = "Duplicate buffer in new tab" })
 vim.keymap.set("n", "H", [[gT]], { desc = "Tab left" })
