@@ -13,12 +13,17 @@ return {
     ---@type blink.cmp.Config
     opts = {
 
-        -- C-space: Open menu or open docs if already open
-        -- C-n/C-p or Up/Down: Select next/previous item
-        -- C-y to accept
-        -- C-e: Hide menu
-        -- C-k: Toggle signature help (if signature.enabled = true)
-        keymap = { preset = 'default' },
+        keymap = {
+            ['<C-space>'] = { 'show', 'show_documentation', 'hide_documentation' },
+            ['<C-y>'] = { 'select_and_accept', 'fallback' },
+            ['<C-p>'] = { 'select_prev', 'fallback_to_mappings' },
+            ['<C-n>'] = { 'select_next', 'fallback_to_mappings' },
+            ['<Tab>'] = {},
+            ['<S-Tab>'] = {},
+            -- ['<C-b>'] = { 'scroll_documentation_up', 'fallback' },
+            -- ['<C-f>'] = { 'scroll_documentation_down', 'fallback' },
+            -- ['<C-k>'] = { 'show_signature', 'hide_signature', 'fallback' },
+        },
 
         appearance = {
             nerd_font_variant = 'mono'
