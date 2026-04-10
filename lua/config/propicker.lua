@@ -42,16 +42,18 @@ function M.project_menu()
 
             if vim.fn.isdirectory(tpath) == 1 then
                 local iter = vim.uv.fs_scandir(tpath)
-                local name, type = vim.uv.fs_scandir_next(iter)
-                while name ~= nil do
-                    if type == "directory" then
-                        local project = {}
-                        projectCount = projectCount + 1
-                        project.name = name
-                        project.path = tpath .. "/" .. name
-                        table.insert(projects, project)
+                if iter ~= nil then
+                    local name, type = vim.uv.fs_scandir_next(iter)
+                    while name ~= nil do
+                        if type == "directory" then
+                            local project = {}
+                            projectCount = projectCount + 1
+                            project.name = name
+                            project.path = tpath .. "/" .. name
+                            table.insert(projects, project)
+                        end
+                        name, type = vim.uv.fs_scandir_next(iter)
                     end
-                    name, type = vim.uv.fs_scandir_next(iter)
                 end
             elseif tpath ~= "" then
                 print(tpath .. " is not a valid project groups folder")
@@ -142,7 +144,7 @@ vim.api.nvim_create_autocmd(
     'UIEnter',
     {
         callback = function ()
-            if next(vim.fn.argv()) == nil then
+            if next(vim.fn.argv()) == nil then ---@diagnostic disable-line: param-type-mismatch
                 M.project_menu()
             end
         end,
