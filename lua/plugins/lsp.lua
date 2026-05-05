@@ -7,7 +7,7 @@ return {
     },
     lazy = false,
     config = function()
-        vim.lsp.set_log_level("off")
+        vim.lsp.log.set_level("off")
 
         vim.lsp.config("lua_ls", {
             filetypes = { "lua" },
