@@ -12,15 +12,30 @@ return {
             end,
         })
         local ensureInstalled = {
+            -- low-level
             "c",
             "cpp",
             "rust",
+
+            -- scripting
             "lua",
+            "python",
+
+            -- vim
             "vim",
             "vimdoc",
             "query",
+
+            -- markdown
             "markdown",
-            "markdown_inline"
+            "markdown_inline",
+
+            -- web
+            "json",
+            "javascript",
+            "typescript",
+            "css",
+            "html",
         }
         local alreadyInstalled = require('nvim-treesitter.config').get_installed()
         local parsersToInstall = vim.iter(ensureInstalled)
