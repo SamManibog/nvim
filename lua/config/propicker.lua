@@ -38,7 +38,7 @@ function M.project_menu()
     --handle groups
     if projFolderGroupsRaw ~= nil then
         for path in (projFolderGroupsRaw .. ";"):gmatch("([^;]*);") do
-            local tpath = trim(path)
+            local tpath = vim.fn.expand(trim(path))
 
             if vim.fn.isdirectory(tpath) == 1 then
                 local iter = vim.uv.fs_scandir(tpath)
@@ -64,7 +64,7 @@ function M.project_menu()
     --handle individual projects
     if projFoldersRaw ~= nil then
         for path in (projFoldersRaw .. ";"):gmatch("([^;]*);") do
-            local tpath = trim(path)
+            local tpath = vim.fn.expand(trim(path))
 
             if vim.fn.isdirectory(tpath) == 1 then
                 local project = {}
@@ -89,6 +89,11 @@ function M.project_menu()
         table.insert(menuText, padding .. index .. " - " .. project.name)
         index_map[index] = project.path
         index = index + 1
+    end
+
+    if index == 1 then
+        print("No projects exist.")
+        return
     end
 
     local p
