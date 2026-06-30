@@ -1,7 +1,8 @@
 return {
     {
         "https://github.com/github/copilot.vim",
-        lazy = false,
+
+        lazy = true,
         config = function ()
             vim.keymap.set('i', '<C-Y>', 'copilot#Accept("\\<CR>")', {
                 expr = true,
@@ -16,8 +17,15 @@ return {
     {
         "CopilotC-Nvim/CopilotChat.nvim",
         dependencies = {
+            "https://github.com/github/copilot.vim",
             { "nvim-lua/plenary.nvim", branch = "master" },
         },
+
+        keys = {
+            { "<leader>c" },
+        },
+
+        lazy = true,
         -- build = "make tiktoken",
         config = function ()
             local chat = require("CopilotChat")

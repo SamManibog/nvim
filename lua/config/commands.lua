@@ -19,3 +19,14 @@ vim.api.nvim_create_user_command(
         desc = "sets colors to dark theme",
     }
 )
+
+vim.api.nvim_create_user_command(
+    "EnableCopilot",
+    function (_)
+        print("Enabling Github Copilot")
+    end,
+    {
+        nargs = 0,
+        desc = "Enables the github copilot plugin",
+    }
+)
