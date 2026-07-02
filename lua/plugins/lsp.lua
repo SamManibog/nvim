@@ -81,7 +81,7 @@ return {
             enable_roslyn_analyzers = true,
             ]]
         })
-        vim.lsp.enable("omnisharp")
+        --vim.lsp.enable("omnisharp")
 
         vim.lsp.config("omnisharp-mono", {
             cmd = {
@@ -92,6 +92,17 @@ return {
             root_markers = { ".csproj" },
         })
         --vim.lsp.enable("omnisharp-mono")
+        
+        vim.lsp.config("roslyn-language-server", {
+            cmd = {
+                "roslyn-language-server",
+                "--stdio",
+                "--autoLoadProjects",
+            },
+            filetypes = { "cs" },
+            root_markers = { ".csproj" },
+        })
+        vim.lsp.enable("roslyn-language-server")
 
         vim.lsp.config("eslint", {
             cmd = {

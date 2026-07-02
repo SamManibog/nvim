@@ -20,9 +20,21 @@ vim.keymap.set("n", "<C-c>", "<Esc>")
 
 vim.keymap.set("n", "Q", "<Nop>")
 
-vim.keymap.set("n", "<leader>f", function()
-    vim.lsp.buf.format()
-end, { desc = "Format buffer" })
+vim.api.nvim_create_autocmd('LspAttach', {
+    callback = function(args)
+        local client = vim.lsp.get_client_by_id(args.data.client_id)
+        if not client then return end
+
+        -- Only bind if the active LSP server supports formatting
+        if client.supports_method('textDocument/formatting') then
+            vim.keymap.set('n', '<leader>f', function()
+                vim.lsp.buf.format({ bufnr = args.buf, async = true })
+            end, { buffer = args.buf, desc = 'LSP format buffer' })
+        else
+            print("LSP '"..client.name.."' does not support code formatting")
+        end
+    end,
+})
 
 --quick toggle (s)hell
 local dir_utils = require("director.utils")

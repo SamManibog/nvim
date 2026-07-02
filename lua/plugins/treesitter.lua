@@ -37,7 +37,10 @@ return {
             "css",
             "html",
         }
-        local alreadyInstalled = require('nvim-treesitter.config').get_installed()
+
+        -- install treesitter parsers
+        local tsConfig = require('nvim-treesitter.config')
+        local alreadyInstalled = tsConfig.get_installed()
         local parsersToInstall = vim.iter(ensureInstalled)
             :filter(function(parser)
                 return not vim.tbl_contains(alreadyInstalled, parser)
